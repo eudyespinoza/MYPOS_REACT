@@ -76,10 +76,18 @@ export const normalizeClient = (raw: ClientResponse): Client => {
   ) || undefined;
   const email = stringValue(raw.email ?? '', '') || undefined;
   const phone = stringValue(raw.telefono ?? raw.phone ?? '', '') || undefined;
-  const address = stringValue(
-    raw.direccion_completa ?? raw.direccion ?? raw.address ?? '',
-    '',
-  ) || undefined;
+  const composedAddress = [raw.calle, raw.altura]
+    .map((part) => stringValue(part ?? ''))
+    .filter(Boolean)
+    .join(' ');
+  const address =
+    stringValue(
+      raw.direccion_completa ??
+        raw.direccion ??
+        raw.address ??
+        composedAddress,
+      '',
+    ) || undefined;
   const preferredStoreId = stringValue(raw.store_preferida ?? '', '') || undefined;
 
   return {
