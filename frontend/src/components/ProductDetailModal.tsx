@@ -1,5 +1,6 @@
 
 import { useQuery } from '@tanstack/react-query';
+import { clsx } from 'clsx';
 import type { Product } from '@/types/product';
 import { fetchProductAttributes } from '@/api/products';
 import { queryKeys } from '@/api/queryKeys';
@@ -16,10 +17,12 @@ const formatCurrency = (value: number) =>
   value.toLocaleString('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2 });
 
 export const ProductDetailModal = ({ open, onClose, product, onAdd }: Props) => {
+  const productId = product?.id ?? '';
+
   const { data: attributes, isLoading } = useQuery({
-    queryKey: queryKeys.productAttributes(product?.id ?? 'unknown'),
-    queryFn: () => fetchProductAttributes(product!.id),
-    enabled: open && !!product,
+    queryKey: queryKeys.productAttributes(productId),
+    queryFn: () => fetchProductAttributes(productId),
+    enabled: open && productId.length > 0,
   });
 
   if (!product) return null;
@@ -76,7 +79,10 @@ export const ProductDetailModal = ({ open, onClose, product, onAdd }: Props) => 
           </button>
           <button
             type="button"
-            className="rounded-lg bg-primary-500 px-4 py-2 text-xs font-semibold text-white shadow transition hover:bg-primary-400"
+            className={clsx(
+              'rounded-lg bg-primary-500 px-4 py-2 text-xs font-semibold text-white shadow transition',
+              'hover:bg-primary-400',
+            )}
             onClick={() => onAdd(product, 1)}
           >
             Agregar al carrito

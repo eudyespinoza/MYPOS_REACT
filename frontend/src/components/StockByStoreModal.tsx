@@ -14,10 +14,13 @@ interface Props {
 }
 
 export const StockByStoreModal = ({ open, onClose, product, storeId }: Props) => {
+  const productCode = product?.code ?? '';
+  const activeStoreId = storeId ?? '';
+
   const { data: stockRows = [], isLoading } = useQuery<StockRow[]>({
-    queryKey: queryKeys.stock(product?.code ?? 'unknown', storeId ?? 'unknown'),
-    queryFn: () => fetchStockByStore(product!.code, storeId!),
-    enabled: open && !!product && !!storeId,
+    queryKey: queryKeys.stock(productCode, activeStoreId),
+    queryFn: () => fetchStockByStore(productCode, activeStoreId),
+    enabled: open && productCode.length > 0 && activeStoreId.length > 0,
   });
 
   if (!product) return null;

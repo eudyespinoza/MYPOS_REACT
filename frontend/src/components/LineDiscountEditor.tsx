@@ -1,5 +1,6 @@
 
 import { useEffect, useState } from 'react';
+import { clsx } from 'clsx';
 import type { LineDiscount } from '@/types/cart';
 import { Modal } from './Modal';
 
@@ -40,22 +41,24 @@ export const LineDiscountEditor = ({ open, onClose, initial, onSave }: Props) =>
           <div className="flex gap-2">
             <button
               type="button"
-              className={`flex-1 rounded-lg border px-3 py-2 text-sm ${
+              className={clsx(
+                'flex-1 rounded-lg border px-3 py-2 text-sm',
                 type === 'percent'
                   ? 'border-primary-500 bg-primary-500/20 text-primary-200'
-                  : 'border-slate-700 bg-slate-900 text-slate-300'
-              }`}
+                  : 'border-slate-700 bg-slate-900 text-slate-300',
+              )}
               onClick={() => setType('percent')}
             >
               Porcentaje %
             </button>
             <button
               type="button"
-              className={`flex-1 rounded-lg border px-3 py-2 text-sm ${
+              className={clsx(
+                'flex-1 rounded-lg border px-3 py-2 text-sm',
                 type === 'amount'
                   ? 'border-primary-500 bg-primary-500/20 text-primary-200'
-                  : 'border-slate-700 bg-slate-900 text-slate-300'
-              }`}
+                  : 'border-slate-700 bg-slate-900 text-slate-300',
+              )}
               onClick={() => setType('amount')}
             >
               Monto $
@@ -71,7 +74,10 @@ export const LineDiscountEditor = ({ open, onClose, initial, onSave }: Props) =>
             min="0"
             value={value}
             onChange={(event) => setValue(Number(event.target.value))}
-            className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/40"
+            className={clsx(
+              'w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100',
+              'focus:outline-none focus:ring-2 focus:border-primary-500 focus:ring-primary-500/40',
+            )}
             disabled={!type}
           />
         </div>
@@ -91,7 +97,10 @@ export const LineDiscountEditor = ({ open, onClose, initial, onSave }: Props) =>
           </button>
           <button
             type="submit"
-            className="rounded-lg bg-primary-500 px-4 py-2 text-sm font-semibold text-white shadow transition hover:bg-primary-400 disabled:opacity-60"
+            className={clsx(
+              'rounded-lg bg-primary-500 px-4 py-2 text-sm font-semibold text-white shadow transition',
+              'hover:bg-primary-400 disabled:opacity-60',
+            )}
             disabled={!type}
           >
             Aplicar
