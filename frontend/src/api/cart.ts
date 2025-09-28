@@ -2,7 +2,7 @@
 import { deserializeCartSnapshot } from '@/utils/totals';
 import type { CartSnapshot } from '@/types/cart';
 
-interface UserInfoResponse {
+export interface UserInfoResponse {
   email?: string;
   username?: string;
   stores?: string[];

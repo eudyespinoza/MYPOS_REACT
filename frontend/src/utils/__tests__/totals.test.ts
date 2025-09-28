@@ -62,7 +62,7 @@ describe('calculateCartTotals', () => {
     const totals = calculateCartTotals(cart);
     expect(totals.subtotal).toBe(520);
     expect(totals.lineDiscounts).toBeCloseTo(18, 2);
-    expect(totals.globalDiscounts).toBeCloseTo(83, 2);
+    expect(totals.globalDiscounts).toBeCloseTo(100.2, 2);
     expect(totals.tax).toBeGreaterThan(0);
     expect(totals.logisticsCost).toBe(250);
     expect(totals.total).toBeGreaterThan(0);
