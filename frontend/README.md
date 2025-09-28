@@ -11,7 +11,7 @@ Single screen Point of Sale UI built with React 18, TypeScript, Tailwind CSS, Zu
 
 ```bash
 pnpm install      # instala dependencias
-pnpm dev          # arranca Vite en modo desarrollo (http://localhost:5173)
+pnpm dev          # arranca Vite en modo desarrollo (http://localhost:3000)
 pnpm build        # genera build listo para producción en dist/
 pnpm preview      # sirve el build para verificación
 pnpm test         # ejecuta las pruebas unitarias (Vitest)

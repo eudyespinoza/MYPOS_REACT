@@ -6,7 +6,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
 
   const backendUrl = env.VITE_BACKEND_URL || 'http://localhost:8000';
-  const devServerPort = Number(env.VITE_PORT ?? '') || 5173;
+  const devServerPort = Number(env.VITE_PORT) || 3000;
 
   const createProxyConfig = () => ({
     target: backendUrl,
