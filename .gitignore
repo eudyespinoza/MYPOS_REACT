@@ -12,3 +12,8 @@ yarn-error.log*
 .vscode/
 .idea/
 .DS_Store
+app/src/config.ini
+app/src/quotations/local/P-000000001.json
+app/src/sessions/sessionidd324luarzg5k6bl7k5yy5expjeo6a3sd
+app/src/sessions/sessionidlm3x9alsejpz5wepwq1wj49kqbca0l0z
+frontend/src/components/ClientSearch.tsx
