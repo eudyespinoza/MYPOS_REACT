@@ -1,8 +1,10 @@
-﻿import { useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import { clsx } from 'clsx';
 import { useCartStore } from '@/stores/useCartStore';
 import { useUiStore } from '@/stores/useUiStore';
+import { useToastStore } from '@/stores/useToastStore';
 import { calculateLineTotals } from '@/utils/totals';
+import { openQuotePrint } from '@/utils/print';
 import type { CartLine } from '@/types/cart';
 import { LineDiscountEditor } from './LineDiscountEditor';
 import { LogisticsSelector } from './LogisticsSelector';
@@ -32,6 +34,8 @@ export const CartPanel = ({ stores, onOpenClients }: CartPanelProps) => {
   const {
     isCartOpen,
     setCartOpen,
+    isDiscountsOpen,
+    setDiscountsOpen,
     isLogisticsOpen,
     setLogisticsOpen,
     isPaymentsOpen,
@@ -42,6 +46,7 @@ export const CartPanel = ({ stores, onOpenClients }: CartPanelProps) => {
   } = useUiStore();
 
   const [targetLine, setTargetLine] = useState<CartLine | null>(null);
+  const pushToast = useToastStore((state) => state.pushToast);
 
   const lineSummaries = useMemo(
     () =>
@@ -56,6 +61,21 @@ export const CartPanel = ({ stores, onOpenClients }: CartPanelProps) => {
     () => cart.lines.reduce((acc, line) => acc + line.quantity, 0),
     [cart.lines],
   );
+
+  useEffect(() => {
+    if (!isDiscountsOpen) return;
+    if (cart.lines.length === 0) {
+      pushToast({
+        tone: 'info',
+        title: 'Sin productos en el carrito',
+        description: 'Agrega un producto antes de asignar descuentos.',
+      });
+      setDiscountsOpen(false);
+      return;
+    }
+    setTargetLine(cart.lines[0]);
+    setDiscountsOpen(false);
+  }, [isDiscountsOpen, cart.lines, setDiscountsOpen, pushToast]);
 
   return (
     <aside
@@ -227,6 +247,22 @@ export const CartPanel = ({ stores, onOpenClients }: CartPanelProps) => {
           onChange={(event) => setNote(event.target.value)}
         />
         <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            className="rounded-lg border border-slate-700 px-3 py-2 text-xs text-slate-300 transition hover:border-slate-500"
+            onClick={() => {
+              const success = openQuotePrint(cart, totals);
+              if (!success) {
+                pushToast({
+                  tone: 'error',
+                  title: 'No se pudo abrir la vista de impresión',
+                  description: 'Verifica los permisos del navegador para ventanas emergentes.',
+                });
+              }
+            }}
+          >
+            Imprimir presupuesto
+          </button>
           <button
             type="button"
             className="rounded-lg border border-slate-700 px-3 py-2 text-xs text-slate-300 transition hover:border-slate-500"

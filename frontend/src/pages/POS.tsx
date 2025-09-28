@@ -8,6 +8,7 @@ import { useCartStore } from '@/stores/useCartStore';
 import { useFiltersStore } from '@/stores/useFiltersStore';
 import { useSessionStore } from '@/stores/useSessionStore';
 import { useUiStore } from '@/stores/useUiStore';
+import { useToastStore } from '@/stores/useToastStore';
 import { useCartRemoteSync } from '@/hooks/useCartRemoteSync';
 import { useHotkeys } from '@/hooks/useHotkeys';
 import { useBarcode } from '@/hooks/useBarcode';
@@ -18,6 +19,7 @@ import { ProductDetailModal } from '@/components/ProductDetailModal';
 import { StockByStoreModal } from '@/components/StockByStoreModal';
 import { ClientSearch } from '@/components/ClientSearch';
 import { Modal } from '@/components/Modal';
+import { AuxiliarySearchPanels } from '@/components/AuxiliarySearchPanels';
 import type { Product } from '@/types/product';
 
 const normalize = (value: string) =>
@@ -30,8 +32,15 @@ const normalize = (value: string) =>
 const matchesTokens = (haystack: string[], tokens: string[]) =>
   tokens.every((token) => haystack.some((value) => value.includes(token)));
 
+const getErrorMessage = (error: unknown, fallback: string) => {
+  if (error instanceof Error && error.message) return error.message;
+  if (typeof error === 'string' && error) return error;
+  return fallback;
+};
+
 export const POSPage = () => {
   const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const pushToast = useToastStore((state) => state.pushToast);
 
   const {
     isCartOpen,
@@ -43,6 +52,7 @@ export const POSPage = () => {
     setSimulatorOpen,
     setLogisticsOpen,
     setPaymentsOpen,
+    setDiscountsOpen,
     hotkeys,
     theme,
     toggleTheme,
@@ -56,6 +66,7 @@ export const POSPage = () => {
     needsSync,
     isSyncing,
     setClient,
+    remoteError,
   } = useCartStore((state) => ({
     addProduct: state.addProduct,
     hydrateRemoteCart: state.hydrateRemoteCart,
@@ -64,6 +75,7 @@ export const POSPage = () => {
     needsSync: state.needsSync,
     isSyncing: state.isSyncing,
     setClient: state.setClient,
+    remoteError: state.remoteError,
   }));
 
   const {
@@ -105,6 +117,12 @@ export const POSPage = () => {
     queryKey: queryKeys.userInfo,
     queryFn: fetchUserInfo,
     staleTime: 5 * 60 * 1000,
+    onError: (error) =>
+      pushToast({
+        tone: 'error',
+        title: 'No se pudo obtener la sesión',
+        description: getErrorMessage(error, 'Reintenta más tarde o vuelve a iniciar sesión.'),
+      }),
   });
 
   useEffect(() => {
@@ -129,6 +147,12 @@ export const POSPage = () => {
     onSuccess: (snapshot) => {
       if (snapshot) hydrateRemoteCart(snapshot);
     },
+    onError: (error) =>
+      pushToast({
+        tone: 'warning',
+        title: 'No se pudo cargar el carrito remoto',
+        description: getErrorMessage(error, 'Puedes seguir operando offline.'),
+      }),
   });
 
   const productsQuery = useQuery({
@@ -136,10 +160,22 @@ export const POSPage = () => {
     queryFn: () => fetchAllProducts(storeId ?? ''),
     enabled: Boolean(storeId),
     staleTime: 60 * 1000,
+    onError: (error) =>
+      pushToast({
+        tone: 'error',
+        title: 'Error al cargar productos',
+        description: getErrorMessage(error, 'Revisa la conexión e intenta nuevamente.'),
+      }),
   });
 
   const updateStoreMutation = useMutation({
     mutationFn: (value: string) => updateLastStore(value),
+    onError: (error) =>
+      pushToast({
+        tone: 'warning',
+        title: 'No se pudo actualizar la sucursal preferida',
+        description: getErrorMessage(error, 'Los cambios se guardarán cuando vuelva la conexión.'),
+      }),
   });
 
   const barcodeMutation = useMutation({
@@ -148,8 +184,15 @@ export const POSPage = () => {
       if (product) {
         addProduct(product, product.multiple || 1);
         setCartOpen(true);
+        pushToast({ tone: 'success', title: `${product.name} agregado`, description: `Código ${product.code}` });
       }
     },
+    onError: (error) =>
+      pushToast({
+        tone: 'warning',
+        title: 'No se encontró el producto escaneado',
+        description: getErrorMessage(error, 'Verifica el código o intenta desde la búsqueda manual.'),
+      }),
   });
 
   const products = productsQuery.data ?? [];
@@ -243,6 +286,15 @@ export const POSPage = () => {
         handler: () => setCartOpen(!isCartOpen),
       },
       {
+        combo: hotkeys.openDiscounts,
+        preventDefault: true,
+        handler: () => {
+          if (cart.lines.length === 0) return;
+          setDiscountsOpen(true);
+          setCartOpen(true);
+        },
+      },
+      {
         combo: hotkeys.openLogistics,
         preventDefault: true,
         handler: () => setLogisticsOpen(true),
@@ -273,8 +325,30 @@ export const POSPage = () => {
         handler: () => setHelpOpen(true),
       },
     ],
-    [isCartOpen, hotkeys, setCartOpen, setClientsPanelOpen, setSimulatorOpen, setLogisticsOpen, setPaymentsOpen, syncNow, setHelpOpen],
+    [
+      isCartOpen,
+      hotkeys,
+      cart.lines.length,
+      setCartOpen,
+      setClientsPanelOpen,
+      setSimulatorOpen,
+      setLogisticsOpen,
+      setPaymentsOpen,
+      setDiscountsOpen,
+      syncNow,
+      setHelpOpen,
+    ],
   );
+
+  useEffect(() => {
+    if (remoteError) {
+      pushToast({
+        tone: 'warning',
+        title: 'Sincronización pendiente',
+        description: remoteError,
+      });
+    }
+  }, [remoteError, pushToast]);
 
   useBarcode({
     enabled: true,
@@ -285,6 +359,7 @@ export const POSPage = () => {
     () => [
       { combo: hotkeys.focusSearch, description: 'Foco buscador' },
       { combo: hotkeys.toggleCart, description: 'Abrir/cerrar carrito' },
+      { combo: hotkeys.openDiscounts, description: 'Descuento de línea' },
       { combo: hotkeys.openClients, description: 'Clientes' },
       { combo: hotkeys.openLogistics, description: 'Logística' },
       { combo: hotkeys.openPayments, description: 'Multipago placeholder' },
@@ -294,6 +369,22 @@ export const POSPage = () => {
     [hotkeys],
   );
 
+  const handleOrderSearch = (number: string) => {
+    pushToast({
+      tone: 'info',
+      title: `Pedido ${number}`,
+      description: 'La integración estará disponible en la próxima iteración.',
+    });
+  };
+
+  const handleQuoteSearch = (number: string) => {
+    pushToast({
+      tone: 'info',
+      title: `Presupuesto ${number}`,
+      description: 'Podrás abrir el detalle cuando se conecte al backend.',
+    });
+  };
+
   return (
     <div className="mx-auto flex min-h-screen max-w-[1440px] flex-col gap-4 px-4 py-6 text-slate-100">
       <TopBar
@@ -301,6 +392,7 @@ export const POSPage = () => {
         onQueryChange={setQuery}
         onClearQuery={() => setQuery('')}
         searchRef={searchInputRef}
+        onBarcodeScan={(code) => barcodeMutation.mutate(code)}
         theme={theme}
         onToggleTheme={toggleTheme}
         stores={stores}
@@ -464,6 +556,8 @@ export const POSPage = () => {
 
         <CartPanel stores={stores} onOpenClients={() => setClientsPanelOpen(true)} />
       </div>
+
+      <AuxiliarySearchPanels onSearchOrder={handleOrderSearch} onSearchQuote={handleQuoteSearch} />
 
       <ProductDetailModal
         open={Boolean(selectedProduct)}

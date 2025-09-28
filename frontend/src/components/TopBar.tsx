@@ -2,6 +2,7 @@
 import { useMemo } from 'react';
 import { clsx } from 'clsx';
 import { SearchBar } from './SearchBar';
+import { BarcodeScannerButton } from './barcode/BarcodeScannerButton';
 import type { ThemeMode } from '@/stores/useUiStore';
 
 interface TopBarProps {
@@ -9,6 +10,7 @@ interface TopBarProps {
   onQueryChange: (value: string) => void;
   onClearQuery: () => void;
   searchRef: RefObject<HTMLInputElement>;
+  onBarcodeScan: (code: string) => void;
   theme: ThemeMode;
   onToggleTheme: () => void;
   stores: string[];
@@ -27,6 +29,7 @@ export const TopBar = ({
   onQueryChange,
   onClearQuery,
   searchRef,
+  onBarcodeScan,
   theme,
   onToggleTheme,
   stores,
@@ -52,8 +55,9 @@ export const TopBar = ({
   return (
     <header className="flex flex-col gap-4 rounded-2xl border border-slate-800/80 bg-slate-950/70 p-4 shadow-lg lg:flex-row lg:items-center lg:justify-between">
       <div className="flex flex-1 items-center gap-3">
-        <div className="w-full max-w-xl">
+        <div className="flex w-full max-w-xl items-center gap-2">
           <SearchBar ref={searchRef} value={query} onChange={onQueryChange} onClear={onClearQuery} />
+          <BarcodeScannerButton onDetect={onBarcodeScan} />
         </div>
         <select
           className="h-10 rounded-lg border border-slate-700 bg-slate-900 px-3 text-sm text-slate-100 focus:border-primary-500 focus:outline-none"

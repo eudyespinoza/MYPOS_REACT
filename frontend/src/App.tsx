@@ -1,5 +1,6 @@
 ﻿import { useEffect } from 'react';
 import { POSPage } from './pages/POS';
+import { ToastContainer } from './components/ToastContainer';
 import { useUiStore } from './stores/useUiStore';
 
 const App = () => {
@@ -12,7 +13,12 @@ const App = () => {
     root.classList.toggle('dark', theme === 'dark');
   }, [theme]);
 
-  return <POSPage />;
+  return (
+    <>
+      <POSPage />
+      <ToastContainer />
+    </>
+  );
 };
 
 export default App;

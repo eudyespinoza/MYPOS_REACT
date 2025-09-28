@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { Client } from '@/types/client';
 import { searchClients, createClient, ClientPayload } from '@/api/clients';
 import { queryKeys } from '@/api/queryKeys';
+import { useToastStore } from '@/stores/useToastStore';
 import { Modal } from './Modal';
 
 interface Props {
@@ -33,12 +34,19 @@ export const ClientSearch = ({ open, onClose, onSelect }: Props) => {
   const [query, setQuery] = useState('');
   const [form, setForm] = useState<NewClientForm>(defaultForm);
   const queryClient = useQueryClient();
+  const pushToast = useToastStore((state) => state.pushToast);
 
   const { data: results, isFetching } = useQuery({
     queryKey: queryKeys.clients(query),
     queryFn: () => searchClients(query),
     enabled: open && query.trim().length > 2,
     initialData: [] as Client[],
+    onError: (error) =>
+      pushToast({
+        tone: 'warning',
+        title: 'No se pudo buscar clientes',
+        description: error instanceof Error ? error.message : 'Reintenta en unos segundos.',
+      }),
   });
 
   const createMutation = useMutation({
@@ -48,7 +56,14 @@ export const ClientSearch = ({ open, onClose, onSelect }: Props) => {
       onSelect(client);
       setForm(defaultForm);
       onClose();
+      pushToast({ tone: 'success', title: 'Cliente creado', description: client.name });
     },
+    onError: (error) =>
+      pushToast({
+        tone: 'error',
+        title: 'No se pudo crear el cliente',
+        description: error instanceof Error ? error.message : 'Revisa los datos ingresados.',
+      }),
   });
 
   const canSubmit = useMemo(() => form.nombre.trim().length >= 2, [form.nombre]);
@@ -56,6 +71,7 @@ export const ClientSearch = ({ open, onClose, onSelect }: Props) => {
   const handleSelect = (client: Client) => {
     onSelect(client);
     onClose();
+    pushToast({ tone: 'info', title: 'Cliente seleccionado', description: client.name });
   };
 
   return (
