@@ -13,8 +13,10 @@ necesidad de un scheduler interno.
 from __future__ import annotations
 
 import json
+import math
 import os
 import threading
+import unicodedata
 from datetime import datetime
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
@@ -286,6 +288,149 @@ def list_products(
     sliced = table.slice(start, items_per_page)
     records = sliced.to_pylist()
     return [_normalize_product(record) for record in records]
+
+
+def _normalize_text(value: Any) -> str:
+    text = _string(value).lower()
+    if not text:
+        return ""
+    normalized = unicodedata.normalize("NFD", text)
+    cleaned = "".join(ch for ch in normalized if ch.isalnum() or ch in {" ", "-", "."})
+    return cleaned.strip()
+
+
+def _matches_tokens(haystack: List[str], tokens: List[str]) -> bool:
+    if not tokens:
+        return True
+    return all(any(token in candidate for candidate in haystack if candidate) for token in tokens)
+
+
+@app.get("/api/productos/search")
+def search_products(
+    store: Optional[str] = Query(None, description="Identificador de tienda"),
+    query: str = Query("", description="Texto libre para buscar"),
+    category: str = Query("", description="Filtrar por categoría"),
+    coverage_group: str = Query("", description="Filtrar por grupo de cobertura"),
+    min_price: Optional[float] = Query(None, ge=0, description="Precio mínimo"),
+    max_price: Optional[float] = Query(None, ge=0, description="Precio máximo"),
+    stock_positive: bool = Query(True, description="Incluir productos con stock positivo"),
+    stock_zero: bool = Query(True, description="Incluir productos con stock cero"),
+    stock_negative: bool = Query(False, description="Incluir productos con stock negativo"),
+    sort: str = Query("relevance", description="Criterio de ordenamiento"),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(20, ge=1, le=200),
+) -> Dict[str, Any]:
+    table = parquet_cache.load(CACHE_FILE_PRODUCTOS)
+    if table is None:
+        return {
+            "items": [],
+            "total": 0,
+            "page": page,
+            "per_page": per_page,
+            "total_pages": 1,
+            "facets": {"categories": [], "coverage_groups": []},
+        }
+
+    table = _rename_columns(table, PRODUCT_COLUMN_MAPPING)
+    table = _filter_by_store(table, store)
+
+    tokens = [token for token in _normalize_text(query).split() if token]
+    normalized_category = _normalize_text(category)
+    normalized_coverage = _normalize_text(coverage_group)
+
+    categories: Dict[str, str] = {}
+    coverage_groups: Dict[str, str] = {}
+    filtered: List[Dict[str, Any]] = []
+
+    include_positive = bool(stock_positive)
+    include_zero = bool(stock_zero)
+    include_negative = bool(stock_negative)
+    apply_stock_filter = include_positive or include_zero or include_negative
+
+    for batch in _iter_batches(table):
+        for record in batch:
+            product = _normalize_product(record)
+
+            category_value = _string(product.get("categoria"))
+            if category_value:
+                key = category_value.strip()
+                upper = key.upper()
+                categories.setdefault(upper, key)
+
+            coverage_value = _string(product.get("grupo_cobertura"))
+            if coverage_value:
+                key = coverage_value.strip()
+                upper = key.upper()
+                coverage_groups.setdefault(upper, key)
+
+            if normalized_category and _normalize_text(category_value) != normalized_category:
+                continue
+            if normalized_coverage and _normalize_text(coverage_value) != normalized_coverage:
+                continue
+
+            price_value = _coerce_float(product.get("precio"), 0.0)
+            if min_price is not None and price_value < float(min_price):
+                continue
+            if max_price is not None and price_value > float(max_price):
+                continue
+
+            stock_value = _coerce_float(product.get("total_disponible_venta") or product.get("stock"), 0.0)
+            if apply_stock_filter:
+                matches_stock = False
+                if include_positive and stock_value > 0:
+                    matches_stock = True
+                if include_zero and stock_value == 0:
+                    matches_stock = True
+                if include_negative and stock_value < 0:
+                    matches_stock = True
+                if not matches_stock:
+                    continue
+
+            haystack = [
+                _normalize_text(product.get("nombre")),
+                _normalize_text(product.get("descripcion")),
+                _normalize_text(product.get("categoria")),
+                _normalize_text(product.get("grupo_cobertura")),
+                _normalize_text(product.get("codigo")),
+                _normalize_text(product.get("barcode")),
+            ]
+            if not _matches_tokens(haystack, tokens):
+                continue
+
+            filtered.append(product)
+
+    if sort == "priceAsc":
+        filtered.sort(key=lambda item: _coerce_float(item.get("precio"), 0.0))
+    elif sort == "priceDesc":
+        filtered.sort(key=lambda item: _coerce_float(item.get("precio"), 0.0), reverse=True)
+    elif sort == "nameAsc":
+        filtered.sort(key=lambda item: _normalize_text(item.get("nombre")))
+    elif sort == "nameDesc":
+        filtered.sort(key=lambda item: _normalize_text(item.get("nombre")), reverse=True)
+    elif sort == "stockDesc":
+        filtered.sort(
+            key=lambda item: _coerce_float(item.get("total_disponible_venta") or item.get("stock"), 0.0),
+            reverse=True,
+        )
+
+    total = len(filtered)
+    total_pages = max(1, math.ceil(total / per_page))
+    current_page = min(page, total_pages)
+    start = (current_page - 1) * per_page
+    end = start + per_page
+    items = filtered[start:end]
+
+    return {
+        "items": items,
+        "total": total,
+        "page": current_page,
+        "per_page": per_page,
+        "total_pages": total_pages,
+        "facets": {
+            "categories": sorted(categories.values(), key=lambda value: value.lower()),
+            "coverage_groups": sorted(coverage_groups.values(), key=lambda value: value.lower()),
+        },
+    }
 
 
 @app.get("/api/productos/by_code")

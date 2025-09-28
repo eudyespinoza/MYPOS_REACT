@@ -10,7 +10,7 @@ export type SortOption =
   | 'nameDesc'
   | 'stockDesc';
 
-interface StockFilters {
+export interface StockFilters {
   positive: boolean;
   zero: boolean;
   negative: boolean;

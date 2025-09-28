@@ -3,7 +3,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { fetchUserInfo, fetchRemoteCart, updateLastStore } from '@/api/cart';
 import type { UserInfoResponse } from '@/api/cart';
-import { fetchAllProducts, fetchProductByCode } from '@/api/products';
+import { fetchProductByCode, searchProducts } from '@/api/products';
+import type { ProductsSearchResult } from '@/api/products';
 import { queryKeys } from '@/api/queryKeys';
 import { useCartStore } from '@/stores/useCartStore';
 import { useFiltersStore } from '@/stores/useFiltersStore';
@@ -24,16 +25,6 @@ import { AuxiliarySearchPanels } from '@/components/AuxiliarySearchPanels';
 import { getBootstrapData } from '@/utils/bootstrap';
 import type { Product } from '@/types/product';
 import type { CartSnapshot } from '@/types/cart';
-
-const normalize = (value: string) =>
-  value
-    .normalize('NFD')
-    .replace(/[^\w\s.-]/g, '')
-    .toLowerCase()
-    .trim();
-
-const matchesTokens = (haystack: string[], tokens: string[]) =>
-  tokens.every((token) => haystack.some((value) => value.includes(token)));
 
 const getErrorMessage = (error: unknown, fallback: string) => {
   if (error instanceof Error && error.message) return error.message;
@@ -187,9 +178,32 @@ export const POSPage = () => {
     });
   }, [pushToast, remoteCartQuery.error]);
 
-  const productsQuery = useQuery<Product[]>({
-    queryKey: storeId ? queryKeys.products(storeId) : ['products', 'default'],
-    queryFn: () => fetchAllProducts(storeId ?? ''),
+  const productsQuery = useQuery<ProductsSearchResult>({
+    queryKey: queryKeys.products({
+      storeId: storeId ?? null,
+      query,
+      category,
+      coverageGroup,
+      minPrice,
+      maxPrice,
+      stock,
+      sort,
+      page,
+      perPage,
+    }),
+    queryFn: () =>
+      searchProducts({
+        storeId,
+        query,
+        category,
+        coverageGroup,
+        minPrice,
+        maxPrice,
+        stock,
+        sort,
+        page,
+        perPage,
+      }),
     enabled: Boolean(storeId),
     staleTime: 60 * 1000,
   });
@@ -233,75 +247,17 @@ export const POSPage = () => {
       }),
   });
 
-  const products = productsQuery.data ?? [];
+  const searchResult: ProductsSearchResult | undefined = productsQuery.data;
+  const categories: string[] = searchResult?.categories ?? [];
+  const coverageGroups: string[] = searchResult?.coverageGroups ?? [];
+  const paginatedProducts: Product[] = searchResult?.items ?? [];
+  const totalPages: number = searchResult?.totalPages ?? 1;
+  const totalResults: number = searchResult?.total ?? 0;
 
-  const categories = useMemo(() => {
-    const set = new Set<string>();
-    products.forEach((product) => {
-      if (product.category) set.add(product.category);
-    });
-    return Array.from(set).sort();
-  }, [products]);
-
-  const coverageGroups = useMemo(() => {
-    const set = new Set<string>();
-    products.forEach((product) => {
-      if (product.coverageGroup) set.add(product.coverageGroup);
-    });
-    return Array.from(set).sort();
-  }, [products]);
-
-  const filteredProducts = useMemo(() => {
-    const tokens = query ? normalize(query).split(/\s+/).filter(Boolean) : [];
-    return products
-      .filter((product) => {
-        if (category && product.category !== category) return false;
-        if (coverageGroup && normalize(product.coverageGroup ?? '') !== normalize(coverageGroup)) return false;
-        if (minPrice != null && product.price < minPrice) return false;
-        if (maxPrice != null && product.price > maxPrice) return false;
-        const stockValue = product.stock ?? 0;
-        if (!stock.positive && stockValue > 0) return false;
-        if (!stock.zero && stockValue === 0) return false;
-        if (!stock.negative && stockValue < 0) return false;
-        if (tokens.length) {
-          const haystack = [
-            normalize(product.name),
-            normalize(product.code),
-            normalize(product.category ?? ''),
-            normalize(product.coverageGroup ?? ''),
-            normalize(product.barcode ?? ''),
-          ];
-          if (!matchesTokens(haystack, tokens)) return false;
-        }
-        return true;
-      })
-      .sort((a, b) => {
-        switch (sort) {
-          case 'priceAsc':
-            return a.price - b.price;
-          case 'priceDesc':
-            return b.price - a.price;
-          case 'nameAsc':
-            return a.name.localeCompare(b.name);
-          case 'nameDesc':
-            return b.name.localeCompare(a.name);
-          case 'stockDesc':
-            return (b.stock ?? 0) - (a.stock ?? 0);
-          default:
-            return 0;
-        }
-      });
-  }, [products, query, category, coverageGroup, minPrice, maxPrice, stock, sort]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / perPage));
   useEffect(() => {
+    if (!searchResult) return;
     if (page > totalPages) setPage(totalPages);
-  }, [page, totalPages, setPage]);
-
-  const paginatedProducts = useMemo(() => {
-    const start = (page - 1) * perPage;
-    return filteredProducts.slice(start, start + perPage);
-  }, [filteredProducts, page, perPage]);
+  }, [page, totalPages, searchResult, setPage]);
 
   const handleStoreChange = (value: string) => {
     setStoreId(value);
@@ -560,7 +516,7 @@ export const POSPage = () => {
 
           <footer className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-300">
             <div>
-              Página {page} de {totalPages} · {filteredProducts.length} resultados
+              Página {page} de {totalPages} · {totalResults} resultados
             </div>
             <div className="flex items-center gap-2">
               <button
