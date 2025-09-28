@@ -19,6 +19,12 @@ pnpm test         # ejecuta las pruebas unitarias (Vitest)
 
 Durante el desarrollo Vite proxea automáticamente `/api`, `/producto`, `/auth_app` y `/auth` hacia `http://localhost:8000` para evitar problemas de CORS y mantener los redireccionamientos de login en el mismo host del frontend.
 
+### Configurar la URL del backend
+
+- Define la variable `VITE_BACKEND_URL` (por ejemplo en un archivo `.env` o variable de entorno) con la URL base del backend FastAPI.
+- Si no se define, el frontend usará rutas relativas, ideales cuando el reverse proxy sirve backend y frontend bajo el mismo dominio.
+- En Docker Compose ya se provee este valor (`http://web:8000`) para que el frontend converse con el nuevo backend automáticamente.
+
 ## Integración con Django
 
 1. Ejecuta `pnpm build` para generar la carpeta `dist/`.

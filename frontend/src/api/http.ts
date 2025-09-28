@@ -35,6 +35,23 @@ const isBodyInit = (value: unknown): value is BodyInit => {
   return false;
 };
 
+const isAbsoluteUrl = (url: string) => /^https?:\/\//i.test(url);
+
+const getBaseUrl = () => {
+  const raw = import.meta.env.VITE_BACKEND_URL as string | undefined;
+  if (!raw) return '';
+  const trimmed = raw.trim();
+  return trimmed.endsWith('/') ? trimmed.slice(0, -1) : trimmed;
+};
+
+const buildRequestUrl = (input: string) => {
+  if (!input) return input;
+  if (isAbsoluteUrl(input)) return input;
+  const baseUrl = getBaseUrl();
+  if (!baseUrl) return input;
+  return `${baseUrl}/${input.replace(/^\//, '')}`;
+};
+
 export const request = async <T = unknown>(input: string, options: RequestOptions = {}): Promise<T> => {
   const { parseAs = 'json', headers, method, body, ...rest } = options;
   const defaultHeaders: HeadersInit = {
@@ -82,7 +99,7 @@ export const request = async <T = unknown>(input: string, options: RequestOption
   }
 
   try {
-    const response = await fetch(input, { ...init, method });
+    const response = await fetch(buildRequestUrl(input), { ...init, method });
     const payload = await parseResponse(response, parseAs);
 
     if (!response.ok) {
