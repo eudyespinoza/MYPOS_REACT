@@ -37,11 +37,46 @@ const isBodyInit = (value: unknown): value is BodyInit => {
 
 const isAbsoluteUrl = (url: string) => /^https?:\/\//i.test(url);
 
+const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
+
+const removeTrailingSlash = (value: string) => (value.endsWith('/') ? value.slice(0, -1) : value);
+
+const getBrowserOrigin = () => {
+  if (typeof window === 'undefined') return '';
+  return removeTrailingSlash(window.location.origin);
+};
+
+const shouldFallbackToBrowserOrigin = (url: URL) => {
+  if (typeof window === 'undefined') return false;
+
+  const hostname = url.hostname.trim();
+  if (!hostname) return true;
+
+  const normalizedHost = hostname.toLowerCase();
+
+  if (LOCAL_HOSTS.has(normalizedHost)) return false;
+  if (normalizedHost === window.location.hostname.toLowerCase()) return false;
+
+  const looksInternalNetworkHost = !normalizedHost.includes('.');
+  return looksInternalNetworkHost;
+};
+
 const getBaseUrl = () => {
   const raw = import.meta.env.VITE_BACKEND_URL as string | undefined;
-  if (!raw) return '';
-  const trimmed = raw.trim();
-  return trimmed.endsWith('/') ? trimmed.slice(0, -1) : trimmed;
+  const trimmed = raw?.trim();
+
+  if (!trimmed) return getBrowserOrigin();
+
+  try {
+    const base = new URL(trimmed, typeof window !== 'undefined' ? window.location.origin : undefined);
+    if (shouldFallbackToBrowserOrigin(base)) {
+      return getBrowserOrigin();
+    }
+    return removeTrailingSlash(base.toString());
+  } catch (error) {
+    console.warn('Invalid VITE_BACKEND_URL, falling back to browser origin:', error);
+    return getBrowserOrigin() || removeTrailingSlash(trimmed);
+  }
 };
 
 const buildRequestUrl = (input: string) => {
