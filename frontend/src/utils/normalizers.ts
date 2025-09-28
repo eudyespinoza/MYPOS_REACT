@@ -93,6 +93,82 @@ export const normalizeClient = (raw: ClientResponse): Client => {
   } satisfies Client;
 };
 
+export const normalizeLegacyClient = (raw: unknown): Client | null => {
+  if (!raw || typeof raw !== 'object') return null;
+  const candidate = raw as Record<string, unknown>;
+
+  const get = (key: string): unknown => candidate[key];
+
+  const isModernShape =
+    typeof get('id') === 'string' &&
+    typeof get('name') === 'string' &&
+    !('numero_cliente' in candidate) &&
+    !('nombre_cliente' in candidate) &&
+    !('nif' in candidate) &&
+    !('dni' in candidate) &&
+    !('doc' in candidate);
+
+  if (isModernShape) {
+    const id = stringValue(get('id'), fallbackId());
+    const name = stringValue(get('name'), id);
+    const document = stringValue(get('document'), '') || undefined;
+    const email = stringValue(get('email'), '') || undefined;
+    const phone = stringValue(get('phone'), '') || undefined;
+    const address = stringValue(get('address'), '') || undefined;
+    const preferredStoreId = stringValue(get('preferredStoreId'), '') || undefined;
+    return {
+      id,
+      name,
+      document,
+      email,
+      phone,
+      address,
+      preferredStoreId,
+    } satisfies Client;
+  }
+
+  const response: ClientResponse = {
+    numero_cliente:
+      (get('numero_cliente') as string | number | undefined) ??
+      (get('id') as string | number | undefined) ??
+      (get('nif') as string | undefined) ??
+      (get('doc') as string | undefined) ??
+      (get('dni') as string | undefined),
+    id:
+      (get('id') as string | number | undefined) ??
+      (get('numero_cliente') as string | number | undefined) ??
+      (get('nif') as string | undefined) ??
+      (get('doc') as string | undefined) ??
+      (get('dni') as string | undefined),
+    nombre_completo: get('nombre_completo') as string | undefined,
+    nombre_cliente: get('nombre_cliente') as string | undefined,
+    full_name: get('full_name') as string | undefined,
+    display_name: get('display_name') as string | undefined,
+    razon_social: get('razon_social') as string | undefined,
+    nombre: get('nombre') as string | undefined,
+    apellido: get('apellido') as string | undefined,
+    doc: (get('doc') as string | undefined) ?? (get('nif') as string | undefined),
+    dni: get('dni') as string | undefined,
+    nif: get('nif') as string | undefined,
+    cuit: get('cuit') as string | undefined,
+    email:
+      (get('email') as string | undefined) ??
+      (get('email_contacto') as string | undefined) ??
+      (get('emailContacto') as string | undefined),
+    telefono:
+      (get('telefono') as string | undefined) ??
+      (get('telefono_contacto') as string | undefined) ??
+      (get('telefonoContacto') as string | undefined),
+    phone: get('phone') as string | undefined,
+    direccion: get('direccion') as string | undefined,
+    direccion_completa: get('direccion_completa') as string | undefined,
+    address: get('address') as string | undefined,
+    store_preferida: get('store_preferida') as string | undefined,
+  } satisfies ClientResponse;
+
+  return normalizeClient(response);
+};
+
 export const normalizeStockRow = (raw: StockRowResponse): StockRow => {
   const storeName = stringValue(
     raw.almacen ?? raw.almacen_nombre ?? raw.warehouse ?? raw.Warehouse ?? raw.store ?? '—',

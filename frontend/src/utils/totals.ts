@@ -1,5 +1,6 @@
-﻿import type { CartLine, CartSnapshot, CartTotals } from '@/types/cart';
+import type { CartLine, CartSnapshot, CartTotals, LogisticsInfo } from '@/types/cart';
 import { clamp, round, toNumber } from './number';
+import { normalizeLegacyClient } from './normalizers';
 
 export interface LineTotals {
   gross: number;
@@ -66,69 +67,214 @@ export const calculateCartTotals = (cart: CartSnapshot): CartTotals => {
   };
 };
 
-export const deserializeCartSnapshot = (raw: unknown): CartSnapshot | null => {
-  if (!raw || typeof raw !== 'object') return null;
-  const draft = raw as Partial<CartSnapshot> & { lines?: unknown[] };
+const optionalString = (value: unknown): string | undefined => {
+  if (value == null) return undefined;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed.length ? trimmed : undefined;
+  }
+  if (typeof value === 'number' || typeof value === 'bigint') {
+    return `${value}`;
+  }
+  return undefined;
+};
+
+const requiredString = (value: unknown, fallback: string): string => optionalString(value) ?? fallback;
+
+const fallbackUuid = (): string =>
+  typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random()}`;
+
+const parseLogistics = (raw: unknown): LogisticsInfo => {
+  const base: LogisticsInfo = {
+    mode: 'pickup',
+    cost: 0,
+  };
+  if (!raw || typeof raw !== 'object') return { ...base };
+  const source = raw as Record<string, unknown>;
+  const get = (key: string): unknown => source[key];
+  const modeRaw = optionalString(get('mode')) ?? optionalString(get('tipo'));
+  let mode: LogisticsInfo['mode'] = 'pickup';
+  if (modeRaw) {
+    const lowered = modeRaw.toLowerCase();
+    if (lowered === 'delivery' || lowered === 'envio' || lowered === 'entrega') mode = 'delivery';
+    else if (lowered === 'pickup' || lowered === 'retiro') mode = 'pickup';
+  }
+  const storeId = optionalString(get('storeId')) ?? optionalString(get('sucursal'));
+  const scheduledDate = optionalString(get('scheduledDate')) ?? optionalString(get('fecha'));
+  const address = optionalString(get('address')) ?? optionalString(get('direccion'));
+  const notes = optionalString(get('notes')) ?? optionalString(get('obs'));
+  const cost = Math.max(0, toNumber(get('cost') ?? get('costo')) || 0);
+
+  return {
+    mode,
+    storeId,
+    scheduledDate,
+    address,
+    cost,
+    notes,
+  } satisfies LogisticsInfo;
+};
+
+const parseLineCandidate = (candidate: unknown): CartLine | null => {
+  if (!candidate || typeof candidate !== 'object') return null;
+  const source = candidate as Record<string, unknown> & {
+    discount?: { type?: unknown; value?: unknown } | null;
+  };
+  const get = (key: string): unknown => source[key];
+  const productId = optionalString(
+    get('productId') ??
+      get('product_id') ??
+      get('id') ??
+      get('codigo') ??
+      get('code') ??
+      get('sku') ??
+      get('numero_producto'),
+  );
+  if (!productId) return null;
+  const name = requiredString(get('name') ?? get('nombre') ?? get('descripcion'), productId);
+  const code = requiredString(get('code') ?? get('sku') ?? get('numero_producto') ?? get('codigo'), productId);
+  const lineId = requiredString(get('lineId') ?? get('line_id'), fallbackUuid());
+  const price = toNumber(get('price') ?? get('precio') ?? get('precio_unit')) || 0;
+  const iva = toNumber(get('iva') ?? get('taxRate') ?? get('tax_rate')) || 0;
+  const quantity = Math.max(0.0001, toNumber(get('quantity') ?? get('cantidad')) || 1);
+  const unit = requiredString(get('unit') ?? get('unidad'), 'Un');
+  const multiple = Math.max(0.0001, toNumber(get('multiple') ?? get('multiplo')) || 1);
+  const weightKg = Math.max(0, toNumber(get('weightKg') ?? get('pesoKg') ?? get('peso')) || 0);
+
+  let discount: CartLine['discount'] = null;
+  const discountCandidate = source.discount;
+  if (discountCandidate && typeof discountCandidate === 'object') {
+    const type = discountCandidate.type === 'percent' || discountCandidate.type === 'amount' ? discountCandidate.type : null;
+    discount = type
+      ? {
+          type,
+          value: toNumber(discountCandidate.value) || 0,
+        }
+      : null;
+  } else {
+    const percent = toNumber(get('discountPercent') ?? get('descuentoPorcentaje'));
+    const amount = toNumber(get('discountAmount') ?? get('descuentoMonto'));
+    if (percent) {
+      discount = {
+        type: 'percent',
+        value: percent,
+      };
+    } else if (amount) {
+      discount = {
+        type: 'amount',
+        value: amount,
+      };
+    }
+  }
+
+  const note = optionalString(get('note') ?? get('nota'));
+
+  return {
+    lineId,
+    productId,
+    code,
+    name,
+    price,
+    iva,
+    quantity,
+    unit,
+    multiple,
+    weightKg,
+    discount,
+    note,
+  } satisfies CartLine;
+};
+
+export interface DeserializeCartSnapshotMeta {
+  converted?: boolean;
+}
+
+export const deserializeCartSnapshot = (
+  raw: unknown,
+  meta?: DeserializeCartSnapshotMeta,
+): CartSnapshot | null => {
+  if (!raw || typeof raw !== 'object') {
+    if (meta) meta.converted = false;
+    return null;
+  }
+
+  const draft = raw as Partial<CartSnapshot> & {
+    lines?: unknown[];
+    items?: unknown[];
+    descPorcentaje?: unknown;
+    descMonto?: unknown;
+    logistica?: unknown;
+    cliente?: unknown;
+  };
+
+  let converted = false;
 
   const lines: CartLine[] = [];
   if (Array.isArray(draft.lines)) {
     for (const candidate of draft.lines) {
-      if (!candidate || typeof candidate !== 'object') continue;
-      const item = candidate as Partial<CartLine> & {
-        discount?: { type?: unknown; value?: unknown };
-      };
-      if (!item.productId || !item.name) continue;
-      lines.push({
-        lineId: String(item.lineId ?? crypto.randomUUID()),
-        productId: String(item.productId),
-        code: String(item.code ?? item.productId ?? ''),
-        name: String(item.name ?? ''),
-        price: toNumber(item.price) || 0,
-        iva: toNumber(item.iva) || 0,
-        quantity: Math.max(0.0001, toNumber(item.quantity) || 1),
-        unit: String(item.unit ?? 'Un'),
-        multiple: Math.max(0.0001, toNumber(item.multiple) || 1),
-        weightKg: Math.max(0, toNumber(item.weightKg) || 0),
-        discount: item.discount
-          ? {
-              type:
-                item.discount.type === 'percent' || item.discount.type === 'amount'
-                  ? item.discount.type
-                  : null,
-              value: toNumber(item.discount.value) || 0,
-            }
-          : null,
-        note: item.note ? String(item.note) : undefined,
-      });
+      const parsed = parseLineCandidate(candidate);
+      if (parsed) lines.push(parsed);
     }
   }
 
-  return {
+  const legacyItems = Array.isArray(draft.items) ? draft.items : undefined;
+  if (!lines.length && legacyItems) {
+    for (const candidate of legacyItems) {
+      const parsed = parseLineCandidate(candidate);
+      if (parsed) lines.push(parsed);
+    }
+    if (lines.length) converted = true;
+  }
+
+  const rawClient = (draft.client as unknown) ?? draft.cliente ?? null;
+  const client = normalizeLegacyClient(rawClient) ?? null;
+  if (!draft.client && draft.cliente && client) converted = true;
+
+  const hasLegacyPercent = draft.globalDiscountPercent == null && draft.descPorcentaje != null;
+  const hasLegacyAmount = draft.globalDiscountAmount == null && draft.descMonto != null;
+  if (hasLegacyPercent || hasLegacyAmount) converted = true;
+
+  const globalDiscountPercent = toNumber(
+    draft.globalDiscountPercent ?? (hasLegacyPercent ? draft.descPorcentaje : undefined),
+  ) || 0;
+  const globalDiscountAmount = toNumber(
+    draft.globalDiscountAmount ?? (hasLegacyAmount ? draft.descMonto : undefined),
+  ) || 0;
+
+  const usedLegacyLogistics = !draft.logistics && draft.logistica;
+  if (usedLegacyLogistics) converted = true;
+  const logisticsSource = draft.logistics ?? draft.logistica;
+  const logistics = parseLogistics(logisticsSource);
+
+  const note = optionalString(draft.note ?? (draft as Record<string, unknown>)['observaciones']) ?? undefined;
+
+  const payments = Array.isArray(draft.payments)
+    ? draft.payments.map((payment) => ({
+        id: requiredString(payment?.id, fallbackUuid()),
+        method: requiredString(payment?.method, ''),
+        amount: toNumber(payment?.amount) || 0,
+        installments: Number(payment?.installments ?? 1) || 1,
+        interest: toNumber(payment?.interest) || 0,
+        brand: optionalString(payment?.brand),
+        reference: optionalString(payment?.reference),
+      }))
+    : [];
+
+  const snapshot: CartSnapshot = {
     lines,
-    client: draft.client ?? null,
-    logistics: {
-      mode: draft.logistics?.mode === 'delivery' ? 'delivery' : 'pickup',
-      storeId: draft.logistics?.storeId,
-      scheduledDate: draft.logistics?.scheduledDate,
-      address: draft.logistics?.address,
-      cost: toNumber(draft.logistics?.cost) || 0,
-      notes: draft.logistics?.notes,
-    },
-    globalDiscountPercent: toNumber(draft.globalDiscountPercent) || 0,
-    globalDiscountAmount: toNumber(draft.globalDiscountAmount) || 0,
-    note: draft.note,
-    payments: Array.isArray(draft.payments)
-      ? draft.payments.map((payment) => ({
-          id: String(payment?.id ?? crypto.randomUUID()),
-          method: String(payment?.method ?? ''),
-          amount: toNumber(payment?.amount) || 0,
-          installments: Number(payment?.installments ?? 1) || 1,
-          interest: toNumber(payment?.interest) || 0,
-          brand: payment?.brand ? String(payment.brand) : undefined,
-          reference: payment?.reference ? String(payment.reference) : undefined,
-        }))
-      : [],
+    client,
+    logistics,
+    globalDiscountPercent,
+    globalDiscountAmount,
+    note,
+    payments,
     simulatorTotals: draft.simulatorTotals,
     updatedAt: draft.updatedAt,
-  } satisfies CartSnapshot;
+  };
+
+  if (meta) meta.converted = converted;
+
+  return snapshot;
 };

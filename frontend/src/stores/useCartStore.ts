@@ -3,7 +3,11 @@ import { persist } from 'zustand/middleware';
 import type { CartSnapshot, CartTotals, CartLine, LineDiscount, LogisticsInfo, PaymentLine } from '@/types/cart';
 import type { Product } from '@/types/product';
 import type { Client } from '@/types/client';
-import { calculateCartTotals, deserializeCartSnapshot } from '@/utils/totals';
+import {
+  calculateCartTotals,
+  deserializeCartSnapshot,
+  type DeserializeCartSnapshotMeta,
+} from '@/utils/totals';
 import { clamp } from '@/utils/number';
 import { createPosStorage } from './storage';
 
@@ -313,7 +317,8 @@ export const useCartStore = create<CartStoreState>()(
         });
       },
       hydrateRemoteCart: (snapshot) => {
-        const parsed = deserializeCartSnapshot(snapshot);
+        const meta: DeserializeCartSnapshotMeta = {};
+        const parsed = deserializeCartSnapshot(snapshot, meta);
         if (!parsed) return;
         set(() => ({
           cart: {
@@ -321,7 +326,7 @@ export const useCartStore = create<CartStoreState>()(
             updatedAt: nowIso(),
           },
           totals: calculateCartTotals(parsed),
-          needsSync: false,
+          needsSync: Boolean(meta.converted),
           remoteError: null,
           lastSyncedAt: nowIso(),
         }));
@@ -335,11 +340,13 @@ export const useCartStore = create<CartStoreState>()(
         if (!persistedState) return currentState;
         const persisted = persistedState as { cart?: unknown } | null;
         const snapshotSource = persisted?.cart ?? currentState.cart;
-        const snapshot = deserializeCartSnapshot(snapshotSource) ?? currentState.cart;
+        const meta: DeserializeCartSnapshotMeta = {};
+        const snapshot = deserializeCartSnapshot(snapshotSource, meta) ?? currentState.cart;
         return {
           ...currentState,
           cart: snapshot,
           totals: calculateCartTotals(snapshot),
+          needsSync: currentState.needsSync || Boolean(meta.converted),
         };
       },
     },

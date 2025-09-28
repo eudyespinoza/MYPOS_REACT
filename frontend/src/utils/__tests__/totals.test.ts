@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { calculateLineTotals, calculateCartTotals } from '@/utils/totals';
+import {
+  calculateLineTotals,
+  calculateCartTotals,
+  deserializeCartSnapshot,
+  type DeserializeCartSnapshotMeta,
+} from '@/utils/totals';
 import type { CartSnapshot, CartLine } from '@/types/cart';
 
 const baseLine = (overrides: Partial<CartLine> = {}): CartLine => ({
@@ -61,5 +66,81 @@ describe('calculateCartTotals', () => {
     expect(totals.tax).toBeGreaterThan(0);
     expect(totals.logisticsCost).toBe(250);
     expect(totals.total).toBeGreaterThan(0);
+  });
+});
+
+describe('deserializeCartSnapshot', () => {
+  it('keeps modern snapshots without conversion', () => {
+    const meta: DeserializeCartSnapshotMeta = {};
+    const snapshot = deserializeCartSnapshot(
+      {
+        lines: [baseLine({ lineId: 'x' })],
+        client: { id: 'c1', name: 'Cliente Actual' },
+        logistics: { mode: 'delivery', cost: 50, address: 'Av. Siempre Viva 123' },
+        globalDiscountPercent: 10,
+        globalDiscountAmount: 20,
+        payments: [],
+      },
+      meta,
+    );
+    expect(snapshot).not.toBeNull();
+    expect(snapshot?.lines).toHaveLength(1);
+    expect(snapshot?.client?.name).toBe('Cliente Actual');
+    expect(snapshot?.logistics.mode).toBe('delivery');
+    expect(snapshot?.globalDiscountPercent).toBe(10);
+    expect(meta.converted).toBe(false);
+  });
+
+  it('converts legacy cart snapshots', () => {
+    const meta: DeserializeCartSnapshotMeta = {};
+    const snapshot = deserializeCartSnapshot(
+      {
+        items: [
+          {
+            id: 'SKU-LEG',
+            nombre: 'Producto legado',
+            precio: '150.5',
+            iva: '21',
+            cantidad: 2,
+            unidad: 'Un',
+            multiplo: 1,
+          },
+        ],
+        descPorcentaje: '5',
+        descMonto: '10',
+        logistica: {
+          tipo: 'envio',
+          direccion: 'Calle Falsa 123',
+          costo: '45.5',
+          fecha: '2024-01-10',
+          obs: 'Llamar antes',
+        },
+        cliente: {
+          numero_cliente: '900',
+          nombre_cliente: 'Cliente Legado',
+          nif: '20-12345678-9',
+          email: 'legacy@example.com',
+          telefono: '555-0000',
+          direccion_completa: 'Calle Falsa 123',
+        },
+      },
+      meta,
+    );
+    expect(snapshot).not.toBeNull();
+    const cart = snapshot!;
+    expect(cart.lines).toHaveLength(1);
+    const [line] = cart.lines;
+    expect(line.productId).toBe('SKU-LEG');
+    expect(line.quantity).toBeCloseTo(2);
+    expect(line.price).toBeCloseTo(150.5);
+    expect(cart.globalDiscountPercent).toBe(5);
+    expect(cart.globalDiscountAmount).toBe(10);
+    expect(cart.logistics.mode).toBe('delivery');
+    expect(cart.logistics.address).toBe('Calle Falsa 123');
+    expect(cart.logistics.cost).toBeCloseTo(45.5);
+    expect(cart.client?.id).toBe('900');
+    expect(cart.client?.name).toBe('Cliente Legado');
+    expect(cart.client?.document).toBe('20-12345678-9');
+    expect(meta.converted).toBe(true);
   });
 });
