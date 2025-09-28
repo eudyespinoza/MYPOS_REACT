@@ -6,22 +6,52 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # External process will post .parquet files to /srv/data/cache (Linux: QA/PROD)
 # or C:\cache (Windows: DEV). Allow override via SERVICES_CACHE_DIR env var.
 
-# Detectar el sistema operativo para usar el directorio correcto
-if os.environ.get("SERVICES_CACHE_DIR"):
-    DEFAULT_CACHE_DIR = os.environ.get("SERVICES_CACHE_DIR")
-elif platform.system() == "Windows":
-    DEFAULT_CACHE_DIR = "C:\\cache"
+# Detectar el sistema operativo para usar el directorio correcto y contemplar
+# entornos híbridos (por ejemplo, desarrollo en Windows ejecutando Docker o
+# WSL donde los archivos siguen viviendo en ``C:\cache``).
+_env_cache_dir = os.environ.get("SERVICES_CACHE_DIR")
+
+_candidate_dirs = []
+if _env_cache_dir:
+    _candidate_dirs.append(_env_cache_dir)
+
+system_name = platform.system()
+if system_name == "Windows":
+    _candidate_dirs.append(r"C:\\cache")
 else:
-    DEFAULT_CACHE_DIR = "/srv/data/cache"
-# Ensure directory exists (no-op if the path already exists or if permissions
-# prevent creation; failures will raise as usual).
-CACHE_DIR = DEFAULT_CACHE_DIR
-try:
-	os.makedirs(CACHE_DIR, exist_ok=True)
-except Exception:
-	# If we can't create the directory (e.g., permissions), continue and
-	# let later IO operations raise clearer errors; do not crash import.
-	pass
+    # Ruta usada en QA/PROD (Linux)
+    _candidate_dirs.append("/srv/data/cache")
+    # Si el proceso se ejecuta en Linux pero los archivos están expuestos desde
+    # Windows (p. ej. montajes compartidos), validar si existe C:\cache y usarlo.
+    windows_cache = r"C:\\cache"
+    if os.path.isdir(windows_cache):
+        _candidate_dirs.append(windows_cache)
+
+# Último recurso: un directorio local dentro del repositorio para desarrollo.
+_candidate_dirs.append(os.path.join(BASE_DIR, "cache"))
+
+def _ensure_cache_dir(path: str) -> bool:
+    """Try to create the directory if needed, returning True on success."""
+    try:
+        os.makedirs(path, exist_ok=True)
+        return True
+    except Exception:
+        # Fall back to simply checking existence in case de permisos.
+        return os.path.isdir(path)
+
+CACHE_DIR = None
+for candidate in _candidate_dirs:
+    if not candidate:
+        continue
+    normalized = os.path.abspath(os.path.expanduser(candidate))
+    if _ensure_cache_dir(normalized):
+        CACHE_DIR = normalized
+        break
+
+# Como salvaguarda, si ninguna ruta funcionó, usa el último candidato y deja
+# que los errores de IO posteriores sean más explícitos.
+if CACHE_DIR is None:
+    CACHE_DIR = os.path.abspath(os.path.expanduser(_candidate_dirs[-1]))
 
 CACHE_FILE_PRODUCTOS = os.path.join(CACHE_DIR, 'productos_cache.parquet')
 CACHE_FILE_STOCK = os.path.join(CACHE_DIR, 'stock_cache.parquet')
