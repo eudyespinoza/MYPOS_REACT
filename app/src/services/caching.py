@@ -255,7 +255,7 @@ def actualizar_cache_codigos_postales():
 
 def obtener_empleado_by_email_from_parquet(email):
     """
-    Busca un empleado por email en el archivo parquet empleados_cache.parquet
+    Busca un empleado por email en el archivo parquet de empleados.
     
     Returns:
         dict: Datos del empleado encontrado o diccionario vacío si no se encuentra

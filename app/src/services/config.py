@@ -53,9 +53,29 @@ for candidate in _candidate_dirs:
 if CACHE_DIR is None:
     CACHE_DIR = os.path.abspath(os.path.expanduser(_candidate_dirs[-1]))
 
-CACHE_FILE_PRODUCTOS = os.path.join(CACHE_DIR, 'productos_cache.parquet')
-CACHE_FILE_STOCK = os.path.join(CACHE_DIR, 'stock_cache.parquet')
-CACHE_FILE_CLIENTES = os.path.join(CACHE_DIR, 'clientes_cache.parquet')
-CACHE_FILE_EMPLEADOS = os.path.join(CACHE_DIR, 'empleados_cache.parquet')
-CACHE_FILE_ATRIBUTOS = os.path.join(CACHE_DIR, 'atributos_cache.parquet')
-CACHE_FILE_CODIGOS_POSTALES = os.path.join(CACHE_DIR, 'codigos_postales_cache.parquet')
+def _build_cache_path(filename: str) -> str:
+    return os.path.join(CACHE_DIR, filename)
+
+
+CACHE_FILE_PRODUCTOS = _build_cache_path('productos_cache.parquet')
+CACHE_FILE_STOCK = _build_cache_path('stock_cache.parquet')
+CACHE_FILE_CLIENTES = _build_cache_path('clientes_cache.parquet')
+
+# Prefer the plain ``empleados.parquet`` file dropped by the external sync
+# process. Keep backwards compatibility with the historical
+# ``empleados_cache.parquet`` name to avoid breaking environments that have not
+# migrated yet. We pick the first existing candidate; otherwise default to the
+# new filename so future writes use the updated convention.
+_empleados_candidates = [
+    _build_cache_path('empleados.parquet'),
+    _build_cache_path('empleados_cache.parquet'),
+]
+for candidate in _empleados_candidates:
+    if os.path.exists(candidate):
+        CACHE_FILE_EMPLEADOS = candidate
+        break
+else:
+    CACHE_FILE_EMPLEADOS = _empleados_candidates[0]
+
+CACHE_FILE_ATRIBUTOS = _build_cache_path('atributos_cache.parquet')
+CACHE_FILE_CODIGOS_POSTALES = _build_cache_path('codigos_postales_cache.parquet')
