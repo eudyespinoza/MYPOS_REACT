@@ -1,0 +1,67 @@
+http:
+  middlewares:
+    redirect-https:
+      redirectScheme:
+        scheme: https
+        permanent: true
+    
+    cors-headers:
+      headers:
+        accessControlAllowOriginList:
+          - "https://mypos-qa.familiabercomat.com"
+          - "http://localhost:3000"
+        accessControlAllowMethods:
+          - "GET"
+          - "POST"
+          - "PUT" 
+          - "DELETE"
+          - "OPTIONS"
+        accessControlAllowHeaders:
+          - "Content-Type"
+          - "Authorization"
+          - "X-Requested-With"
+          - "Accept"
+          - "Origin"
+          - "Idempotency-Key"
+        accessControlAllowCredentials: true
+        accessControlMaxAge: 86400
+
+  routers:
+    http-catchall:
+      rule: "HostRegexp(`{any:.+}`)"
+      entryPoints:
+        - web
+      middlewares:
+        - redirect-https
+      service: noop
+    
+    # Router para el microservicio de facturación
+    invoice-api:
+      rule: "Host(`10.11.0.30`)"
+      entryPoints:
+        - websecure
+      service: invoice-service
+      tls: true
+      middlewares:
+        - cors-headers
+
+  services:
+    noop:
+      loadBalancer:
+        servers:
+          - url: "http://127.0.0.1"
+    
+    # Servicio para el microservicio de facturación
+    invoice-service:
+      loadBalancer:
+        servers:
+          - url: "http://10.11.0.30:8003"
+
+tls:
+  certificates:
+    # Certificado para familiabercomat.com (no tocar)
+    - certFile: /etc/ssl/familiabercomat/_.familiabercomat.com.crt
+      keyFile: /etc/ssl/familiabercomat/_.familiabercomat.com_key.pem
+    # Certificado para servidor 10.11.0.30
+    - certFile: /etc/ssl/server/server.crt
+      keyFile: /etc/ssl/server/server.key

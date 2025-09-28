@@ -1,0 +1,85 @@
+services:
+  traefik:
+    image: traefik:v3.1
+    container_name: traefik
+    command:
+      - --providers.docker=true
+      - --providers.file.filename=/etc/traefik/dynamic.yml
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --api.dashboard=true
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - "./traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro"
+      - "/etc/ssl/familiabercomat:/etc/ssl/familiabercomat:ro"
+      - "/etc/ssl/server:/etc/ssl/server:ro"
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    restart: unless-stopped
+    networks:
+      - default
+      - litecore_default
+
+  web:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    container_name: mypos_web
+    env_file: .env
+    environment:
+      DJANGO_DEBUG: "${DJANGO_DEBUG}"
+      DJANGO_ALLOWED_HOSTS: "${DJANGO_ALLOWED_HOSTS}"
+      DJANGO_CSRF_TRUSTED_ORIGINS: "${DJANGO_CSRF_TRUSTED_ORIGINS}"
+      DJANGO_SECURE_COOKIES: "${DJANGO_SECURE_COOKIES}"
+      DATABASE_URL: "${DATABASE_URL}"
+      SERVICES_DB_DIR: "/data/services_db"
+      SERVICES_CACHE_DIR: "/srv/data/parquet"
+      DJANGO_SESSION_FILE_PATH: "/data/sessions"
+    volumes:
+      - staticfiles:/app/staticfiles
+      - logs:/app/logs:rw
+      - servicesdb:/data/services_db
+      - cache:/data/cache
+      - sessions:/data/sessions
+      - "${PARQUET_CACHE_SOURCE:-/srv/data/parquet}:/srv/data/parquet"
+    user: "1000:1000"
+    expose:
+      - "8000"
+    ports:
+      - "8000:8000"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.mypos-https.rule=Host(`mypos-qa.familiabercomat.com`)"
+      - "traefik.http.routers.mypos-https.entrypoints=websecure"
+      - "traefik.http.routers.mypos-https.tls=true"
+      - "traefik.http.routers.mypos-https.service=mypos"
+      - "traefik.http.routers.mypos-http.rule=Host(`mypos-qa.familiabercomat.com`)"
+      - "traefik.http.routers.mypos-http.entrypoints=web"
+      - "traefik.http.routers.mypos-http.middlewares=redirect-https@file"
+      - "traefik.http.routers.mypos-http.service=mypos"
+      - "traefik.http.services.mypos.loadbalancer.server.port=8000"
+    depends_on:
+      - traefik
+    restart: unless-stopped
+    networks:
+      - default
+      - litecore_default
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5).getcode()==200 else 1)\""]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  staticfiles:
+  logs:
+  servicesdb:
+  cache:
+  sessions:
+
+networks:
+  default:
+    name: mypos-qa_default
+  litecore_default:
+    external: true

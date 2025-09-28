@@ -1,0 +1,420 @@
+﻿  cart.log = {
+    tipo: document.getElementById("logTipoEntrega").value,
+    sucursal: document.getElementById("logSucursal").value,
+    fecha: document.getElementById("logFecha").value,
+    direccion: (document.getElementById("logDireccion").value || document.getElementById("logDireccionInputMirror")?.value || "").trim(),
+    costo: Number(document.getElementById("logCosto").value || 0),
+    obs: (document.getElementById("logObs").value || "").trim()
+  };
+  renderCartOffcanvas();
+  bootstrap.Modal.getOrCreateInstance("#modalLogistica").hide();
+}
+
+/* === POS: Simulador de pagos (modal) === */
+function tiposPagoOptionsHTML() {
+  return `
+    <option value="efectivo">Efectivo</option>
+    <option value="debito">Tarjeta DÃ©bito</option>
+    <option value="credito">Tarjeta CrÃ©dito</option>
+    <option value="transferencia">Transferencia</option>
+    <option value="cheque">Cheque</option>
+  `;
+}
+function tarjetasCreditoOptionsHTML() {
+  return `
+    <option value="">-- Seleccione --</option>
+    <option value="visa">Visa</option>
+    <option value="master">Mastercard</option>
+    <option value="amex">American Express</option>
+  `;
+}
+function renderSimuladorPagosPOS() {
+  const cont = document.getElementById("contenedorPagos");
+  if (!cont) return;
+  cont.innerHTML = "";
+  (cart.pagos || []).forEach((pago, idx) => {
+    const row = document.createElement("div");
+    row.className = "card border-0 shadow-sm";
+    row.innerHTML = `
+      <div class="card-body row g-2 align-items-end">
+        <div class="col-12 col-md-3">
+          <label class="form-label">Medio</label>
+          <select class="form-select tipo">${tiposPagoOptionsHTML()}</select>
+        </div>
+        <div class="col-6 col-md-2">
+          <label class="form-label">Monto</label>
+          <input type="number" class="form-control monto" min="0" step="0.01" value="${pago.monto||0}">
+        </div>
+        <div class="col-6 col-md-2">
+          <label class="form-label">InterÃ©s %</label>
+          <input type="number" class="form-control interes" min="0" step="0.01" value="${pago.interes||0}">
+        </div>
+        <div class="col-6 col-md-2">
+          <label class="form-label">Cuotas</label>
+          <input type="number" class="form-control cuotas" min="1" step="1" value="${pago.cuotas||1}">
+        </div>
+        <div class="col-6 col-md-2">
+          <label class="form-label">Tarjeta</label>
+          <select class="form-select tarjeta">${tarjetasCreditoOptionsHTML()}</select>
+        </div>
+        <div class="col-12 col-md-1 d-grid">
+          <button class="btn btn-outline-danger rem"><i class="bi bi-trash"></i></button>
+        </div>
+      </div>`;
+    cont.appendChild(row);
+
+    row.querySelector(".tipo").value = pago.tipo || "efectivo";
+    row.querySelector(".tarjeta").value = pago.tarjeta || "";
+
+    row.querySelector(".tipo").addEventListener("change", (e) => { pago.tipo = e.target.value; actualizarRestanteSimuladorPOS(); });
+    row.querySelector(".monto").addEventListener("input", (e) => { pago.monto = Number(e.target.value||0); actualizarRestanteSimuladorPOS(); });
+    row.querySelector(".interes").addEventListener("input", (e) => { pago.interes = Number(e.target.value||0); actualizarRestanteSimuladorPOS(); });
+    row.querySelector(".cuotas").addEventListener("input", (e) => { pago.cuotas = clamp(e.target.value,1,60); actualizarRestanteSimuladorPOS(); });
+    row.querySelector(".tarjeta").addEventListener("change", (e) => { pago.tarjeta = e.target.value; });
+    row.querySelector(".rem").addEventListener("click", () => { cart.pagos.splice(idx,1); renderSimuladorPagosPOS(); });
+  });
+  actualizarRestanteSimuladorPOS();
+}
+function actualizarRestanteSimuladorPOS() {
+  const t = calcularTotalesPOS().total;
+  const pagado = (cart.pagos||[]).reduce((acc,p)=> acc + (Number(p.monto)||0) * (1 + Number(p.interes||0)/100), 0);
+  const rest = Math.max(0, t - pagado);
+  const el = document.getElementById("simRestante");
+  if (el) el.textContent = moneyAR(rest);
+}
+function agregarFilaPagoPOS() { cart.pagos = cart.pagos || []; cart.pagos.push({ tipo:"efectivo", monto:0, cuotas:1, tarjeta:"", interes:0 }); renderSimuladorPagosPOS(); }
+function limpiarPagosPOS() { cart.pagos = []; renderSimuladorPagosPOS(); }
+function confirmarSimulacionPagosPOS() {
+  const t = calcularTotalesPOS().total;
+  const pagado = (cart.pagos||[]).reduce((a,p)=> a + (Number(p.monto)||0) * (1 + Number(p.interes||0)/100), 0);
+  if (pagado + 0.01 < t) {
+    if (!confirm("El total ingresado no cubre el monto a pagar. Â¿Continuar igualmente?")) return;
+  }
+  bootstrap.Modal.getOrCreateInstance("#modalPagos").hide();
+}
+
+/* === POS: Presupuesto e inicio de facturaciÃ³n (front) === */
+function imprimirPresupuestoPOS() {
+  const t = calcularTotalesPOS();
+  const html = `
+  <html><head><meta charset="utf-8"><title>Presupuesto</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, 'Helvetica Neue', Arial; margin:24px;}
+    h1{margin:0 0 8px 0}.small{color:#666}
+    table{width:100%;border-collapse:collapse;margin-top:16px}
+    th,td{border-bottom:1px solid #ddd;padding:8px;text-align:left}
+    .totales{margin-top:16px;width:100%}
+    .totales td{padding:4px}.right{text-align:right}
+  </style></head><body>
+  <h1>Presupuesto</h1>
+  <div class="small">Cliente: ${cart.client?.name || "Consumidor final"}</div>
+  <div class="small">Fecha: ${new Date().toLocaleString("es-AR")}</div>
+  <table><thead><tr><th>Producto</th><th>Cant</th><th>Precio</th><th>IVA</th><th>Total</th></tr></thead><tbody>
+    ${
+      (cart.items||[]).map(it=>{
+        const precio = Number(it.price || it.precio || it.precio_unit || it.precio_final_con_descuento || 0);
+        const iva = Number(it.iva || it.tax || 21);
+        const unidad = it.unidad || it.unidad_medida || it.unidadMedida || "Un";
+        const cant = Number(it.quantity || it.cantidad || 1);
+        const cantStr = isUnidadM2(unidad) ? Number(cant).toFixed(2) : String(Number(cant).toFixed(0));
+        return `<tr><td>${it.name || it.nombre || it.nombre_producto || "-"}</td><td>${cantStr}</td><td>${moneyAR(precio)}</td><td>${iva}%</td><td>${moneyAR(precio*cant)}</td></tr>`;
+      }).join("")
+    }
+  </tbody></table>
+  <table class="totales">
+    <tr><td>Subtotal</td><td class="right">${moneyAR(t.subtotal)}</td></tr>
+    <tr><td>Descuentos</td><td class="right">-${moneyAR(t.descuentos)}</td></tr>
+    <tr><td>Impuestos</td><td class="right">${moneyAR(t.impuestos)}</td></tr>
+    <tr><td>Costo envÃ­o</td><td class="right">${moneyAR(t.costoEnvio)}</td></tr>
+    <tr><td><strong>Total</strong></td><td class="right"><strong>${moneyAR(t.total)}</strong></td></tr>
+  </table>
+  <p class="small">LogÃ­stica: ${cart.log?.tipo} â€¢ ${cart.log?.sucursal} â€¢ ${cart.log?.direccion || ""}</p>
+  <p class="small">Motivo descuento: ${cart.desc?.motivo || "-"}</p>
+  <script>window.print();</script>
+  </body></html>`;
+  const w = window.open("", "_blank");
+  w.document.open(); w.document.write(html); w.document.close();
+}
+
+function facturarPOS() {
+  if (!(cart.items||[]).length) { alert("El carrito estÃ¡ vacÃ­o."); return; }
+  const payload = {
+    cliente: cart.client,
+    items: (cart.items||[]).map(it => ({
+      id: it.id || it.product_id || it.numero_producto,
+      nombre: it.name || it.nombre || it.nombre_producto,
+      cantidad: it.quantity || it.cantidad || 1,
+      precio_unit: it.price || it.precio || it.precio_unit || it.precio_final_con_descuento || 0,
+      iva: it.iva || it.tax || 21,
+      unidad: it.unidad || it.unidad_medida || "Un"
+    })),
+    descuentos: cart.desc || { porcentaje:0, monto:0, motivo:"" },
+    logistica: cart.log || {},
+    pagos: cart.pagos || [],
+    totales: calcularTotalesPOS(),
+    metadata: { origen: "pos-web", fecha: new Date().toISOString() }
+  };
+  console.log("Payload FacturaciÃ³n POS:", payload); // <-- Conecta aquÃ­ con tu endpoint (fetch)
+  alert("Factura lista para enviar (ver consola).");
+}
+
+/* === POS: Hook de UI y eventos === */
+function toggleCart() {
+  const off = bootstrap.Offcanvas.getOrCreateInstance("#offCarrito");
+  renderCartOffcanvas();
+  off.toggle();
+}
+
+// Botones del carrito y modales
+document.getElementById("btnLimpiarCliente")?.addEventListener("click", () => {
+  cart.client = null;
+  document.getElementById("lblCliente").textContent = "Consumidor final";
+  renderCartOffcanvas();
+});
+document.getElementById("btnAplicarDescuento")?.addEventListener("click", aplicarDescuentoPOS);
+document.getElementById("btnAplicarLogistica")?.addEventListener("click", aplicarLogisticaPOS);
+document.getElementById("btnAgregarPago")?.addEventListener("click", agregarFilaPagoPOS);
+document.getElementById("btnLimpiarPagos")?.addEventListener("click", limpiarPagosPOS);
+document.getElementById("btnConfirmarPagos")?.addEventListener("click", confirmarSimulacionPagosPOS);
+document.getElementById("btnPresupuesto")?.addEventListener("click", imprimirPresupuestoPOS);
+document.getElementById("btnFacturar")?.addEventListener("click", facturarPOS);
+
+// Cuando abras el modal de pagos, asegurar render
+document.getElementById("modalPagos")?.addEventListener("shown.bs.modal", renderSimuladorPagosPOS);
+
+/* === POS: Dirección de logística (selección y edición) === */
+(function initLogisticaDireccion() {
+  const modal = document.getElementById('modalLogistica');
+  if (!modal) return;
+
+  function getClientAddresses() {
+    const c = cart.client || {};
+    let addrs = [];
+    if (Array.isArray(c.addresses)) addrs = c.addresses.slice();
+    else if (Array.isArray(c.direcciones)) addrs = c.direcciones.slice();
+    else if (Array.isArray(c.domicilios)) addrs = c.domicilios.slice();
+    else if (c.direccion_completa) addrs = [c.direccion_completa];
+    else if (c.direccion) addrs = [c.direccion];
+    // Normalizar a strings
+    return addrs.map(a => typeof a === 'string' ? a : (a?.texto || a?.full || a?.direccion || ''))
+                .filter(s => (s||'').trim().length > 0);
+  }
+
+  function ensureUI() {
+    let section = document.getElementById('logisticaDireccionSection');
+    // Si no existe el bloque, crearlo dinámicamente después del input legacy
+    if (!section) {
+      const legacyWrap = document.getElementById('logDireccion')?.parentElement;
+      if (legacyWrap && legacyWrap.parentElement) {
+        section = document.createElement('div');
+        section.className = 'col-12';
+        section.id = 'logisticaDireccionSection';
+        section.style.display = 'none';
+        section.innerHTML = `
+          <label class="form-label" for="logDireccionSelect">Dirección de entrega</label>
+          <div class="row g-2 align-items-center">
+            <div class="col-12 col-md-6">
+              <select id="logDireccionSelect" class="form-select">
+                <option value="">Elegir dirección…</option>
+              </select>
+            </div>
+            <div class="col-12 col-md-6 d-flex gap-2">
+              <input id="logDireccionInputMirror" type="text" class="form-control" placeholder="Calle, número, ciudad, CP">
+              <button type="button" id="btnEditarDireccion" class="btn btn-outline-secondary">Editar</button>
+            </div>
+          </div>
+          <div id="logDireccionEditor" class="mt-3" style="display:none;">
+            <div class="row g-2">
+              <div class="col-12 col-md-6">
+                <label class="form-label">Calle</label>
+                <input type="text" id="dirCalle" class="form-control" placeholder="Calle">
+              </div>
+              <div class="col-6 col-md-2">
+                <label class="form-label">Número</label>
+                <input type="text" id="dirNumero" class="form-control" placeholder="Número">
+              </div>
+              <div class="col-6 col-md-4">
+                <label class="form-label">Ciudad</label>
+                <input type="text" id="dirCiudad" class="form-control" placeholder="Ciudad">
+              </div>
+              <div class="col-6 col-md-4">
+                <label class="form-label">Provincia</label>
+                <input type="text" id="dirProvincia" class="form-control" placeholder="Provincia">
+              </div>
+              <div class="col-6 col-md-2">
+                <label class="form-label">CP</label>
+                <input type="text" id="dirCP" class="form-control" placeholder="CP">
+              </div>
+              <div class="col-12 col-md-6">
+                <label class="form-label">Referencia</label>
+                <input type="text" id="dirReferencia" class="form-control" placeholder="Piso, dpto, referencias">
+              </div>
+            </div>
+            <div class="mt-2 d-flex gap-2">
+              <button type="button" id="btnGuardarDireccionEdit" class="btn btn-primary">Guardar cambios</button>
+              <button type="button" id="btnCancelarDireccionEdit" class="btn btn-outline-secondary">Cancelar</button>
+            </div>
+          </div>`;
+        legacyWrap.parentElement.insertBefore(section, legacyWrap.nextSibling);
+        // Re-conectar handlers que dependen de estos IDs (simplemente volver a adjuntar)
+        document.getElementById('btnEditarDireccion')?.addEventListener('click', function(){
+          const editor = document.getElementById('logDireccionEditor');
+          if (!editor) return;
+          editor.style.display = '';
+          const mirror = document.getElementById('logDireccionInputMirror');
+          const txt = mirror?.value || '';
+          const parts = (txt || '').split(',').map(s => s.trim());
+          document.getElementById('dirCalle').value = parts[0] || '';
+          document.getElementById('dirNumero').value = (parts[1] || '').replace(/[^0-9]/g,'');
+          document.getElementById('dirCiudad').value = parts[2] || '';
+          document.getElementById('dirProvincia').value = parts[3] || '';
+          document.getElementById('dirCP').value = (parts[4] || '').replace(/[^0-9]/g,'');
+          document.getElementById('dirReferencia').value = '';
+        });
+        document.getElementById('btnCancelarDireccionEdit')?.addEventListener('click', function(){
+          const editor = document.getElementById('logDireccionEditor');
+          if (editor) editor.style.display = 'none';
+        });
+        document.getElementById('btnGuardarDireccionEdit')?.addEventListener('click', function(){
+          function val(id){ return (document.getElementById(id)?.value || '').trim(); }
+          const calle = val('dirCalle');
+          const numero = val('dirNumero');
+          const ciudad = val('dirCiudad');
+          const provincia = val('dirProvincia');
+          const cp = val('dirCP');
+          const ref = val('dirReferencia');
+          const parts = [];
+          if (calle) parts.push(calle + (numero? ' ' + numero : ''));
+          if (ciudad) parts.push(ciudad);
+          if (provincia) parts.push(provincia);
+          if (cp) parts.push(cp);
+          const txt = parts.join(', ') + (ref? ` - ${ref}` : '');
+          const mirror = document.getElementById('logDireccionInputMirror');
+          if (mirror) mirror.value = txt;
+          const legacy = document.getElementById('logDireccion');
+          if (legacy) legacy.value = txt;
+          const sel = document.getElementById('logDireccionSelect');
+          if (sel && sel.value !== '') {
+            sel.options[sel.selectedIndex].textContent = txt || '(sin dirección)';
+            if (!cart.client) cart.client = {};
+            if (!Array.isArray(cart.client.addresses)) cart.client.addresses = getClientAddresses();
+            const idx = Number(sel.value);
+            if (!isNaN(idx)) cart.client.addresses[idx] = txt;
+          }
+          const editor = document.getElementById('logDireccionEditor');
+          if (editor) editor.style.display = 'none';
+        });
+        document.getElementById('logDireccionSelect')?.addEventListener('change', function(){
+          const idx = this.value;
+          const addrs = getClientAddresses();
+          const txt = (idx === '' ? '' : (addrs[Number(idx)] || ''));
+          const mirror = document.getElementById('logDireccionInputMirror');
+          if (mirror) mirror.value = txt;
+          const legacy = document.getElementById('logDireccion');
+          if (legacy) legacy.value = txt;
+        });
+      }
+    }
+    const tipo = document.getElementById('logTipoEntrega');
+    if (!tipo) return;
+    const isEnvio = (tipo.value === 'envio');
+    if (section) section.style.display = isEnvio ? '' : 'none';
+    // Mantener input clásico visible solo si no es envío
+    const legacy = document.getElementById('logDireccion');
+    if (legacy) legacy.parentElement.style.display = isEnvio ? 'none' : '';
+    if (!isEnvio) return;
+
+    // Poblar select
+    const sel = document.getElementById('logDireccionSelect');
+    const mirror = document.getElementById('logDireccionInputMirror');
+    if (!sel || !mirror) return;
+    const options = getClientAddresses();
+    sel.innerHTML = '';
+    const opt0 = document.createElement('option'); opt0.value = ''; opt0.textContent = 'Elegir dirección…'; sel.appendChild(opt0);
+    options.forEach((txt, i) => { const o = document.createElement('option'); o.value = String(i); o.textContent = txt; sel.appendChild(o); });
+    // Por defecto, no seleccionar ninguna; forzar elección del usuario
+    mirror.value = '';
+  }
+
+  modal.addEventListener('shown.bs.modal', ensureUI);
+
+  document.getElementById('logTipoEntrega')?.addEventListener('change', ensureUI);
+
+  document.getElementById('logDireccionSelect')?.addEventListener('change', function () {
+    const sel = this;
+    const idx = sel.value;
+    const addrs = getClientAddresses();
+    const txt = (idx === '' ? '' : (addrs[Number(idx)] || ''));
+    const mirror = document.getElementById('logDireccionInputMirror');
+    if (mirror) mirror.value = txt;
+    // Sincronizar con input clásico para compatibilidad
+    const legacy = document.getElementById('logDireccion');
+    if (legacy) legacy.value = txt;
+  });
+
+  // Editor de dirección
+  document.getElementById('btnEditarDireccion')?.addEventListener('click', function(){
+    const editor = document.getElementById('logDireccionEditor');
+    if (!editor) return;
+    editor.style.display = '';
+    const mirror = document.getElementById('logDireccionInputMirror');
+    const txt = mirror?.value || '';
+    // Relleno heurístico básico a partir de comas
+    const parts = (txt || '').split(',').map(s => s.trim());
+    document.getElementById('dirCalle').value = parts[0] || '';
+    document.getElementById('dirNumero').value = (parts[1] || '').replace(/[^0-9]/g,'');
+    document.getElementById('dirCiudad').value = parts[2] || '';
+    document.getElementById('dirProvincia').value = parts[3] || '';
+    document.getElementById('dirCP').value = (parts[4] || '').replace(/[^0-9]/g,'');
+    document.getElementById('dirReferencia').value = '';
+  });
+
+  document.getElementById('btnCancelarDireccionEdit')?.addEventListener('click', function(){
+    const editor = document.getElementById('logDireccionEditor');
+    if (editor) editor.style.display = 'none';
+  });
+
+  document.getElementById('btnGuardarDireccionEdit')?.addEventListener('click', function(){
+    function val(id){ return (document.getElementById(id)?.value || '').trim(); }
+    const calle = val('dirCalle');
+    const numero = val('dirNumero');
+    const ciudad = val('dirCiudad');
+    const provincia = val('dirProvincia');
+    const cp = val('dirCP');
+    const ref = val('dirReferencia');
+    const parts = [];
+    if (calle) parts.push(calle + (numero? ' ' + numero : ''));
+    if (ciudad) parts.push(ciudad);
+    if (provincia) parts.push(provincia);
+    if (cp) parts.push(cp);
+    const txt = parts.join(', ') + (ref? ` - ${ref}` : '');
+
+    const mirror = document.getElementById('logDireccionInputMirror');
+    if (mirror) mirror.value = txt;
+    const legacy = document.getElementById('logDireccion');
+    if (legacy) legacy.value = txt;
+
+    // Actualizar opción seleccionada si corresponde
+    const sel = document.getElementById('logDireccionSelect');
+    if (sel && sel.value !== '') {
+      sel.options[sel.selectedIndex].textContent = txt || '(sin dirección)';
+      // Persistir en el objeto cliente para esta sesión
+      if (!cart.client) cart.client = {};
+      if (!Array.isArray(cart.client.addresses)) cart.client.addresses = getClientAddresses();
+      const idx = Number(sel.value);
+      if (!isNaN(idx)) cart.client.addresses[idx] = txt;
+    }
+
+    const editor = document.getElementById('logDireccionEditor');
+    if (editor) editor.style.display = 'none';
+  });
+})();
+
+// Refresca el nombre del cliente cuando lo elijas desde el modal existente
+document.addEventListener("client-selected", (ev) => {
+  cart.client = ev.detail;
+  document.getElementById("lblCliente").textContent = cart.client?.name || "Consumidor final";
+  renderCartOffcanvas();
+});
+
+
