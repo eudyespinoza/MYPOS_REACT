@@ -3,6 +3,7 @@ APScheduler
 asgiref
 certifi
 charset-normalizer
+djangorestframework
 Django
 h11
 httpcore
