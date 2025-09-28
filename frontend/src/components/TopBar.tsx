@@ -1,4 +1,4 @@
-﻿import type { RefObject } from 'react';
+import type { RefObject } from 'react';
 import { useMemo } from 'react';
 import { clsx } from 'clsx';
 import { SearchBar } from './SearchBar';
@@ -52,6 +52,8 @@ export const TopBar = ({
     };
   }, [isOnline, isSyncing, needsSync, lastSyncedAt]);
 
+  const actionButtonClasses = 'rounded-lg border border-slate-700 px-3 py-2 text-xs text-slate-300 transition hover:border-primary-400 hover:text-primary-200';
+
   return (
     <header className="flex flex-col gap-4 rounded-2xl border border-slate-800/80 bg-slate-950/70 p-4 shadow-lg lg:flex-row lg:items-center lg:justify-between">
       <div className="flex flex-1 items-center gap-3">
@@ -80,21 +82,21 @@ export const TopBar = ({
         </span>
         <button
           type="button"
-          className="rounded-lg border border-slate-700 px-3 py-2 text-xs text-slate-300 transition hover:border-primary-400 hover:text-primary-200"
+          className={actionButtonClasses}
           onClick={onSaveCart}
         >
           Guardar carrito (F10)
         </button>
         <button
           type="button"
-          className="rounded-lg border border-slate-700 px-3 py-2 text-xs text-slate-300 transition hover:border-primary-400 hover:text-primary-200"
+          className={actionButtonClasses}
           onClick={onOpenHelp}
         >
           Ayuda (F1)
         </button>
         <button
           type="button"
-          className="rounded-lg border border-slate-700 px-3 py-2 text-xs text-slate-300 transition hover:border-primary-400 hover:text-primary-200"
+          className={actionButtonClasses}
           onClick={onToggleTheme}
         >
           Tema: {theme === 'dark' ? 'Oscuro' : 'Claro'}

@@ -135,7 +135,7 @@ export const CartPanel = ({ stores, onOpenClients }: CartPanelProps) => {
                       className="px-3 text-sm text-slate-300 hover:text-white"
                       onClick={() => updateQuantity(line.lineId, Math.max(line.multiple, line.quantity - line.multiple))}
                     >
-                      –
+                      -
                     </button>
                     <input
                       type="number"

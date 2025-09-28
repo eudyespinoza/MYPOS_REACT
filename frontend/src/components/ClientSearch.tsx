@@ -1,4 +1,4 @@
-﻿import { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { Client } from '@/types/client';
 import { searchClients, createClient, ClientPayload } from '@/api/clients';
@@ -36,11 +36,13 @@ export const ClientSearch = ({ open, onClose, onSelect }: Props) => {
   const queryClient = useQueryClient();
   const pushToast = useToastStore((state) => state.pushToast);
 
-  const { data: results, isFetching } = useQuery({
-    queryKey: queryKeys.clients(query),
-    queryFn: () => searchClients(query),
-    enabled: open && query.trim().length > 2,
-    initialData: [] as Client[],
+  const normalizedQuery = query.trim();
+
+  const { data: results = [], isFetching } = useQuery<Client[]>({
+    queryKey: queryKeys.clients(normalizedQuery),
+    queryFn: () => searchClients(normalizedQuery),
+    enabled: open && normalizedQuery.length > 2,
+    initialData: [],
     onError: (error) =>
       pushToast({
         tone: 'warning',
@@ -52,7 +54,7 @@ export const ClientSearch = ({ open, onClose, onSelect }: Props) => {
   const createMutation = useMutation({
     mutationFn: createClient,
     onSuccess: (client) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.clients(query) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.clients(normalizedQuery) });
       onSelect(client);
       setForm(defaultForm);
       onClose();
@@ -124,7 +126,16 @@ export const ClientSearch = ({ open, onClose, onSelect }: Props) => {
             onSubmit={(event) => {
               event.preventDefault();
               if (!canSubmit) return;
-              createMutation.mutate(form as ClientPayload);
+              const payload: ClientPayload = {
+                nombre: form.nombre.trim(),
+                ...(form.apellido.trim() ? { apellido: form.apellido.trim() } : {}),
+                ...(form.email.trim() ? { email: form.email.trim() } : {}),
+                ...(form.telefono.trim() ? { telefono: form.telefono.trim() } : {}),
+                ...(form.doc.trim() ? { doc: form.doc.trim() } : {}),
+                ...(form.direccion.trim() ? { direccion: form.direccion.trim() } : {}),
+              };
+
+              createMutation.mutate(payload);
             }}
           >
             <div className="grid gap-3 sm:grid-cols-2">
