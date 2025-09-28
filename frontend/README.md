@@ -36,6 +36,20 @@ Durante el desarrollo Vite proxea automáticamente `/api`, `/producto` y `/auth_
 <link rel="stylesheet" href="{% static 'pos/assets/index-XYZ.css' %}" />
 ```
 
+### Scripts de bootstrap compatibles con Django
+
+Para mantener la compatibilidad con el template actual de Django, la plantilla debe inyectar dos scripts JSON antes de montar la SPA:
+
+```html
+<script id="backend-stores-data" type="application/json">{{ stores_json|safe }}</script>
+<script id="backend-last-store-data" type="application/json">{{ last_store_json|safe }}</script>
+```
+
+- `backend-stores-data` debe contener la lista de sucursales disponibles (array de strings o un objeto con la clave `stores`).
+- `backend-last-store-data` expone la última sucursal seleccionada (string u objeto con la clave `last_store`).
+
+La app lee estos scripts al iniciar para hidratar `useSessionStore.setStores` y `useFiltersStore.setStoreId` si la respuesta de `/api/user_info` no provee sucursales, evitando romper la experiencia existente mientras conviven ambas fuentes de datos.
+
 ## Hotkeys por defecto
 
 | Acción | Atajo |

@@ -20,6 +20,7 @@ import { StockByStoreModal } from '@/components/StockByStoreModal';
 import { ClientSearch } from '@/components/ClientSearch';
 import { Modal } from '@/components/Modal';
 import { AuxiliarySearchPanels } from '@/components/AuxiliarySearchPanels';
+import { getBootstrapData } from '@/utils/bootstrap';
 import type { Product } from '@/types/product';
 
 const normalize = (value: string) =>
@@ -113,6 +114,22 @@ export const POSPage = () => {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [stockProduct, setStockProduct] = useState<Product | null>(null);
 
+  const bootstrapData = useMemo(() => getBootstrapData(), []);
+
+  useEffect(() => {
+    if (!stores.length && bootstrapData.stores?.length) {
+      setStores(bootstrapData.stores);
+    }
+  }, [bootstrapData, setStores, stores.length]);
+
+  useEffect(() => {
+    if (storeId) return;
+    const fallbackStore = bootstrapData.lastStoreId ?? bootstrapData.stores?.[0] ?? null;
+    if (fallbackStore) {
+      setStoreId(fallbackStore);
+    }
+  }, [bootstrapData, setStoreId, storeId]);
+
   const userInfoQuery = useQuery({
     queryKey: queryKeys.userInfo,
     queryFn: fetchUserInfo,
@@ -137,8 +154,28 @@ export const POSPage = () => {
       if (!storeId) {
         setStoreId(info.last_store ?? availableStores[0]);
       }
+      return;
     }
-  }, [userInfoQuery.data, setUser, setStores, storeId, setStoreId]);
+
+    if (!stores.length && bootstrapData.stores?.length) {
+      setStores(bootstrapData.stores);
+    }
+    if (!storeId) {
+      const fallbackStore =
+        info.last_store ?? bootstrapData.lastStoreId ?? bootstrapData.stores?.[0] ?? null;
+      if (fallbackStore) {
+        setStoreId(fallbackStore);
+      }
+    }
+  }, [
+    bootstrapData,
+    setUser,
+    setStores,
+    storeId,
+    setStoreId,
+    stores.length,
+    userInfoQuery.data,
+  ]);
 
   useQuery({
     queryKey: queryKeys.remoteCart,
