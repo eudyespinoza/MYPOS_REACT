@@ -10,10 +10,8 @@ const toneStyles: Record<string, string> = {
 };
 
 export const ToastContainer = () => {
-  const { toasts, dismissToast } = useToastStore((state) => ({
-    toasts: state.toasts,
-    dismissToast: state.dismissToast,
-  }));
+  const toasts = useToastStore((state) => state.toasts);
+  const dismissToast = useToastStore((state) => state.dismissToast);
 
   useEffect(() => {
     if (!toasts.length) return;

@@ -45,52 +45,38 @@ export const POSPage = () => {
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const pushToast = useToastStore((state) => state.pushToast);
 
-  const {
-    isCartOpen,
-    setCartOpen,
-    setClientsPanelOpen,
-    isClientsPanelOpen,
-    isHelpOpen,
-    setHelpOpen,
-    setSimulatorOpen,
-    setLogisticsOpen,
-    setPaymentsOpen,
-    setDiscountsOpen,
-    hotkeys,
-    theme,
-    toggleTheme,
-  } = useUiStore();
+  const isCartOpen = useUiStore((state) => state.isCartOpen);
+  const setCartOpen = useUiStore((state) => state.setCartOpen);
+  const setClientsPanelOpen = useUiStore((state) => state.setClientsPanelOpen);
+  const isClientsPanelOpen = useUiStore((state) => state.isClientsPanelOpen);
+  const isHelpOpen = useUiStore((state) => state.isHelpOpen);
+  const setHelpOpen = useUiStore((state) => state.setHelpOpen);
+  const setSimulatorOpen = useUiStore((state) => state.setSimulatorOpen);
+  const setLogisticsOpen = useUiStore((state) => state.setLogisticsOpen);
+  const setPaymentsOpen = useUiStore((state) => state.setPaymentsOpen);
+  const setDiscountsOpen = useUiStore((state) => state.setDiscountsOpen);
+  const hotkeys = useUiStore((state) => state.hotkeys);
+  const theme = useUiStore((state) => state.theme);
+  const toggleTheme = useUiStore((state) => state.toggleTheme);
 
-  const {
-    addProduct,
-    hydrateRemoteCart,
-    cart,
-    needsSync,
-    isSyncing,
-    setClient,
-    remoteError,
-  } = useCartStore((state) => ({
-    addProduct: state.addProduct,
-    hydrateRemoteCart: state.hydrateRemoteCart,
-    cart: state.cart,
-    needsSync: state.needsSync,
-    isSyncing: state.isSyncing,
-    setClient: state.setClient,
-    remoteError: state.remoteError,
-  }));
+  const addProduct = useCartStore((state) => state.addProduct);
+  const hydrateRemoteCart = useCartStore((state) => state.hydrateRemoteCart);
+  const cart = useCartStore((state) => state.cart);
+  const needsSync = useCartStore((state) => state.needsSync);
+  const isSyncing = useCartStore((state) => state.isSyncing);
+  const setClient = useCartStore((state) => state.setClient);
+  const remoteError = useCartStore((state) => state.remoteError);
 
-  const {
-    query,
-    category,
-    coverageGroup,
-    minPrice,
-    maxPrice,
-    stock,
-    sort,
-    page,
-    perPage,
-    storeId,
-  } = useFiltersStore();
+  const query = useFiltersStore((state) => state.query);
+  const category = useFiltersStore((state) => state.category);
+  const coverageGroup = useFiltersStore((state) => state.coverageGroup);
+  const minPrice = useFiltersStore((state) => state.minPrice);
+  const maxPrice = useFiltersStore((state) => state.maxPrice);
+  const stock = useFiltersStore((state) => state.stock);
+  const sort = useFiltersStore((state) => state.sort);
+  const page = useFiltersStore((state) => state.page);
+  const perPage = useFiltersStore((state) => state.perPage);
+  const storeId = useFiltersStore((state) => state.storeId);
 
   const setQuery = useFiltersStore((state) => state.setQuery);
   const setStoreId = useFiltersStore((state) => state.setStoreId);
@@ -103,11 +89,9 @@ export const POSPage = () => {
   const setPerPage = useFiltersStore((state) => state.setPerPage);
   const resetFilters = useFiltersStore((state) => state.resetFilters);
 
-  const { setUser, setStores, stores } = useSessionStore((state) => ({
-    setUser: state.setUser,
-    setStores: state.setStores,
-    stores: state.stores,
-  }));
+  const setUser = useSessionStore((state) => state.setUser);
+  const setStores = useSessionStore((state) => state.setStores);
+  const stores = useSessionStore((state) => state.stores);
 
   const { syncNow, isOnline } = useCartRemoteSync();
 

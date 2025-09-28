@@ -20,30 +20,27 @@ const formatCurrency = (value: number) =>
   value.toLocaleString('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2 });
 
 export const CartPanel = ({ stores, onOpenClients }: CartPanelProps) => {
-  const {
-    cart,
-    totals,
-    removeLine,
-    updateQuantity,
-    setLineDiscount,
-    setGlobalDiscounts,
-    setLogistics,
-    setNote,
-    markSynced,
-  } = useCartStore();
-  const {
-    isCartOpen,
-    setCartOpen,
-    isDiscountsOpen,
-    setDiscountsOpen,
-    isLogisticsOpen,
-    setLogisticsOpen,
-    isPaymentsOpen,
-    setPaymentsOpen,
-    isSimulatorOpen,
-    setSimulatorOpen,
-    hotkeys,
-  } = useUiStore();
+  const cart = useCartStore((state) => state.cart);
+  const totals = useCartStore((state) => state.totals);
+  const removeLine = useCartStore((state) => state.removeLine);
+  const updateQuantity = useCartStore((state) => state.updateQuantity);
+  const setLineDiscount = useCartStore((state) => state.setLineDiscount);
+  const setGlobalDiscounts = useCartStore((state) => state.setGlobalDiscounts);
+  const setLogistics = useCartStore((state) => state.setLogistics);
+  const setNote = useCartStore((state) => state.setNote);
+  const markSynced = useCartStore((state) => state.markSynced);
+
+  const isCartOpen = useUiStore((state) => state.isCartOpen);
+  const setCartOpen = useUiStore((state) => state.setCartOpen);
+  const isDiscountsOpen = useUiStore((state) => state.isDiscountsOpen);
+  const setDiscountsOpen = useUiStore((state) => state.setDiscountsOpen);
+  const isLogisticsOpen = useUiStore((state) => state.isLogisticsOpen);
+  const setLogisticsOpen = useUiStore((state) => state.setLogisticsOpen);
+  const isPaymentsOpen = useUiStore((state) => state.isPaymentsOpen);
+  const setPaymentsOpen = useUiStore((state) => state.setPaymentsOpen);
+  const isSimulatorOpen = useUiStore((state) => state.isSimulatorOpen);
+  const setSimulatorOpen = useUiStore((state) => state.setSimulatorOpen);
+  const hotkeys = useUiStore((state) => state.hotkeys);
 
   const [targetLine, setTargetLine] = useState<CartLine | null>(null);
   const pushToast = useToastStore((state) => state.pushToast);
