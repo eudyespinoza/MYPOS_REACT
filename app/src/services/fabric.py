@@ -4,6 +4,7 @@ import pyodbc
 import asyncio
 import configparser
 import requests
+from requests import RequestException
 from services.database import agregar_atributos_masivo, agregar_stock_masivo, \
     agregar_grupos_cumplimiento_masivo, agregar_empleados_masivo, agregar_datos_tienda_masivo
 from services.logging_utils import get_module_logger
@@ -87,10 +88,41 @@ def conectar_fabric_db():
     logger.error("No se pudo establecer conexión con ninguno de los métodos de autenticación.")
     return None
 
-def obtener_parquet_productos():
-    url = 'https://fabricstorageeastus.blob.core.windows.net/fabric/Respondio/Productos_Buscador?sp=re&st=2025-03-31T17:42:39Z&se=2025-04-01T01:42:39Z&spr=https&sv=2024-11-04&sr=b&sig=Eewxv5qqA76g%2BSBvmoHQQJaYfuTLSW7KlMmSJsd0xVU%3D'
-    parquet_productos = requests.get(url)
-    return parquet_productos
+def obtener_parquet_productos(timeout: float | None = 60):
+    """Descarga el archivo Parquet de productos desde Fabric con timeout explícito.
+
+    Un `requests.get` sin timeout puede quedar bloqueado indefinidamente si la
+    red se corta o el servicio deja de responder. Eso termina consumiendo un
+    worker de Gunicorn hasta que excede el ``--timeout`` general y el proceso
+    aborta con ``SystemExit: 1``. Al declarar un timeout concreto devolvemos el
+    control a la aplicación, registramos el error y evitamos que el worker quede
+    colgado.
+
+    Parameters
+    ----------
+    timeout: float | None
+        Timeout en segundos a pasar a ``requests.get``. Se permite ``None`` para
+        conservar el comportamiento bloqueante cuando sea necesario.
+
+    Returns
+    -------
+    requests.Response | None
+        La respuesta HTTP si la descarga fue satisfactoria, ``None`` si hubo un
+        error.
+    """
+
+    url = (
+        "https://fabricstorageeastus.blob.core.windows.net/fabric/Respondio/"
+        "Productos_Buscador?sp=re&st=2025-03-31T17:42:39Z&se=2025-04-01T01:42:39Z&"
+        "spr=https&sv=2024-11-04&sr=b&sig=Eewxv5qqA76g%2BSBvmoHQQJaYfuTLSW7KlMmSJsd0xVU%3D"
+    )
+    try:
+        response = requests.get(url, timeout=timeout)
+        response.raise_for_status()
+        return response
+    except RequestException as exc:
+        logger.error("Error descargando Parquet de productos desde Fabric: %s", exc)
+        return None
 
 def obtener_atributos_fabric():
     """
