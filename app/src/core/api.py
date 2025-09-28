@@ -105,56 +105,82 @@ def products_by_code(request):
         if table is None:
             return ok({'detail': 'Catálogo de productos no disponible'}, status=503)
         table = _rename_columns(table, PRODUCT_COLUMN_MAPPING)
-        df = table.to_pandas()
-        if code:
-            candidates: List[Any] = []
-            for column in ('numero_producto', 'nombre_producto', 'codigo_barras', 'barcode', 'name', 'code'):
-                if column in df.columns:
-                    series = df[column].astype(str).str.lower()
-                    candidates.append(series.str.contains(code, na=False))
-            if candidates:
-                mask = candidates[0]
-                for extra in candidates[1:]:
-                    mask = mask | extra
-                df = df[mask]
-        df = df.head(100)
         data: List[Dict[str, Any]] = []
-        for row in df.to_dict('records'):
-            codigo = _string(row.get('numero_producto') or row.get('productId') or row.get('codigo') or row.get('id'))
-            nombre = _string(
-                row.get('nombre_producto')
-                or row.get('nombre')
-                or row.get('productName')
-                or row.get('descripcion')
-                or codigo,
-                codigo or 'Producto',
-            )
-            categoria = row.get('categoria_producto') or row.get('categoria')
-            precio = _to_float(
-                row.get('precio_final_con_descuento')
-                or row.get('precio_final_con_iva')
-                or row.get('precio')
-            )
-            iva = _to_float(row.get('iva') or 21)
-            item = {
-                'id': codigo or row.get('id') or row.get('productId'),
-                'codigo': codigo,
-                'numero_producto': codigo,
-                'nombre': nombre,
-                'nombre_producto': nombre,
-                'precio': precio,
-                'precio_final_con_descuento': row.get('precio_final_con_descuento', precio),
-                'precio_final_con_iva': row.get('precio_final_con_iva', precio),
-                'iva': iva or 21,
-                'categoria': categoria,
-                'categoria_producto': categoria,
-                'grupo_cobertura': row.get('grupo_cobertura'),
-                'unidad_medida': row.get('unidad_medida') or row.get('unidad') or 'Un',
-                'multiplo': row.get('multiplo') or 1,
-                'total_disponible_venta': row.get('total_disponible_venta') or row.get('stock') or 0,
-                'barcode': row.get('barcode') or row.get('codigo_barras'),
-            }
-            data.append(item)
+        remaining = 100
+        search_columns = (
+            'numero_producto',
+            'nombre_producto',
+            'codigo_barras',
+            'barcode',
+            'name',
+            'code',
+        )
+        for batch in table.to_batches(max_chunksize=2048):
+            batch_df = batch.to_pandas()
+            if code:
+                candidates: List[Any] = []
+                for column in search_columns:
+                    if column in batch_df.columns:
+                        series = batch_df[column].astype(str).str.lower()
+                        candidates.append(series.str.contains(code, na=False))
+                if candidates:
+                    mask = candidates[0]
+                    for extra in candidates[1:]:
+                        mask = mask | extra
+                    batch_df = batch_df[mask]
+                else:
+                    batch_df = batch_df.iloc[0:0]
+            if batch_df.empty:
+                continue
+            batch_df = batch_df.head(remaining)
+            for row in batch_df.to_dict('records'):
+                codigo = _string(
+                    row.get('numero_producto')
+                    or row.get('productId')
+                    or row.get('codigo')
+                    or row.get('id')
+                )
+                nombre = _string(
+                    row.get('nombre_producto')
+                    or row.get('nombre')
+                    or row.get('productName')
+                    or row.get('descripcion')
+                    or codigo,
+                    codigo or 'Producto',
+                )
+                categoria = row.get('categoria_producto') or row.get('categoria')
+                precio = _to_float(
+                    row.get('precio_final_con_descuento')
+                    or row.get('precio_final_con_iva')
+                    or row.get('precio')
+                )
+                iva = _to_float(row.get('iva') or 21)
+                item = {
+                    'id': codigo or row.get('id') or row.get('productId'),
+                    'codigo': codigo,
+                    'numero_producto': codigo,
+                    'nombre': nombre,
+                    'nombre_producto': nombre,
+                    'precio': precio,
+                    'precio_final_con_descuento': row.get('precio_final_con_descuento', precio),
+                    'precio_final_con_iva': row.get('precio_final_con_iva', precio),
+                    'iva': iva or 21,
+                    'categoria': categoria,
+                    'categoria_producto': categoria,
+                    'grupo_cobertura': row.get('grupo_cobertura'),
+                    'unidad_medida': row.get('unidad_medida') or row.get('unidad') or 'Un',
+                    'multiplo': row.get('multiplo') or 1,
+                    'total_disponible_venta': row.get('total_disponible_venta') or row.get('stock') or 0,
+                    'barcode': row.get('barcode') or row.get('codigo_barras'),
+                }
+                data.append(item)
+                remaining -= 1
+                if remaining <= 0:
+                    break
+            if remaining <= 0:
+                break
+        if not data:
+            return ok([])
         return ok(data)
     except Exception:  # pragma: no cover - defensivo
         logger.exception("products_by_code")
