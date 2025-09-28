@@ -71,12 +71,33 @@ services:
       timeout: 5s
       retries: 5
 
+  frontend:
+    image: node:20-alpine
+    container_name: mypos_frontend
+    working_dir: /app
+    environment:
+      VITE_BACKEND_URL: "http://web:8000"
+      VITE_PORT: "3000"
+      NODE_ENV: development
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 3000"
+    ports:
+      - "3000:3000"
+    depends_on:
+      - web
+    restart: unless-stopped
+    networks:
+      - default
+
 volumes:
   staticfiles:
   logs:
   servicesdb:
   cache:
   sessions:
+  frontend_node_modules:
 
 networks:
   default:
