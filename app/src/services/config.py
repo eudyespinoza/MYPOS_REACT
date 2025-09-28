@@ -27,6 +27,15 @@ else:
     if os.path.isdir(windows_cache):
         _candidate_dirs.append(windows_cache)
 
+    # Entornos WSL montan las unidades de Windows bajo /mnt. Aunque el directorio
+    # ``C:\\cache`` existe desde la perspectiva de Windows, desde Linux/WSL la
+    # ruta válida es ``/mnt/c/cache``. Si detectamos esta ubicación la añadimos
+    # como candidata para que los datos aparezcan en el front sin configuraciones
+    # manuales adicionales.
+    wsl_cache = "/mnt/c/cache"
+    if os.path.isdir(wsl_cache):
+        _candidate_dirs.append(wsl_cache)
+
 # Último recurso: un directorio local dentro del repositorio para desarrollo.
 _candidate_dirs.append(os.path.join(BASE_DIR, "cache"))
 
