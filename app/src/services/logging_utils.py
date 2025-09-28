@@ -1,5 +1,6 @@
 import logging
 import os
+import sys
 from typing import Optional
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -24,10 +25,15 @@ def get_module_logger(name: str, level: int = logging.INFO, filename: Optional[s
     if not logger.handlers:
         log_file = filename or f"{name.replace('.', '_')}.log"
         file_path = os.path.join(LOG_DIR, log_file)
-        handler = logging.FileHandler(file_path)
         formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
+
+        file_handler = logging.FileHandler(file_path)
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
+
+        stream_handler = logging.StreamHandler(sys.stdout)
+        stream_handler.setFormatter(formatter)
+        logger.addHandler(stream_handler)
         logger.setLevel(level)
         logger.propagate = False
     return logger
