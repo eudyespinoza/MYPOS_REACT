@@ -3,7 +3,7 @@ import platform
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # By default parquet files are now stored in the server directory requested
-# External process will post .parquet files to /srv/data/parquet (Linux: QA/PROD) 
+# External process will post .parquet files to /srv/data/cache (Linux: QA/PROD)
 # or C:\cache (Windows: DEV). Allow override via SERVICES_CACHE_DIR env var.
 
 # Detectar el sistema operativo para usar el directorio correcto
@@ -12,7 +12,7 @@ if os.environ.get("SERVICES_CACHE_DIR"):
 elif platform.system() == "Windows":
     DEFAULT_CACHE_DIR = "C:\\cache"
 else:
-    DEFAULT_CACHE_DIR = "/srv/data/parquet"
+    DEFAULT_CACHE_DIR = "/srv/data/cache"
 # Ensure directory exists (no-op if the path already exists or if permissions
 # prevent creation; failures will raise as usual).
 CACHE_DIR = DEFAULT_CACHE_DIR

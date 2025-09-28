@@ -8,6 +8,11 @@ export default defineConfig(({ mode }) => {
   const backendUrl = env.VITE_BACKEND_URL || 'http://localhost:8000';
   const devServerPort = Number(env.VITE_PORT ?? '') || 5173;
 
+  const createProxyConfig = () => ({
+    target: backendUrl,
+    changeOrigin: false,
+  });
+
   return {
     plugins: [react()],
     resolve: {
@@ -19,18 +24,10 @@ export default defineConfig(({ mode }) => {
       host: '0.0.0.0',
       port: devServerPort,
       proxy: {
-        '/api': {
-          target: backendUrl,
-          changeOrigin: true,
-        },
-        '/producto': {
-          target: backendUrl,
-          changeOrigin: true,
-        },
-        '/auth_app': {
-          target: backendUrl,
-          changeOrigin: true,
-        },
+        '/api': createProxyConfig(),
+        '/producto': createProxyConfig(),
+        '/auth_app': createProxyConfig(),
+        '/auth': createProxyConfig(),
       },
     },
     test: {

@@ -17,7 +17,7 @@ pnpm preview      # sirve el build para verificación
 pnpm test         # ejecuta las pruebas unitarias (Vitest)
 ```
 
-Durante el desarrollo Vite proxea automáticamente `/api`, `/producto` y `/auth_app` hacia `http://localhost:8000` para evitar problemas de CORS.
+Durante el desarrollo Vite proxea automáticamente `/api`, `/producto`, `/auth_app` y `/auth` hacia `http://localhost:8000` para evitar problemas de CORS y mantener los redireccionamientos de login en el mismo host del frontend.
 
 ## Integración con Django
 

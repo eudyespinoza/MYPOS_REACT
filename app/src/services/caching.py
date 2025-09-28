@@ -54,7 +54,7 @@ except Exception:
 # ----------------------------------------------------------------------
 # Si ya las cargas de otro lado, puedes borrar estas constantes.
 # The external system now places parquet files in SERVICES_CACHE_DIR (default
-# /srv/data/parquet). The old behavior downloaded these files from Fabric; we
+# /srv/data/cache). The old behavior downloaded these files from Fabric; we
 # keep the constants for reference but scheduler-based downloads are removed.
 PRODUCTOS_PARQUET_URL = None
 CLIENTES_PARQUET_URL = None
