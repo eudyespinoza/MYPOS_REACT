@@ -4,6 +4,7 @@ asgiref
 certifi
 charset-normalizer
 Django
+djangorestframework
 h11
 httpcore
 httpx
