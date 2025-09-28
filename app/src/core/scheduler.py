@@ -237,7 +237,7 @@ def start_scheduler_and_jobs():
     # Cachés “simples”
     # NOTE: TODOS los archivos parquet (productos, clientes, stock, atributos, 
     # empleados, codigos_postales) ahora los publica un proceso externo
-    # en /srv/data/parquet (Linux) o C:\cache (Windows).
+    # en /srv/data/cache (Linux) o C:\cache (Windows).
     # Este scheduler solo mantiene jobs para datos que NO son parquet.
 
     # Semanales (datos que van a la base de datos, no a parquet)
