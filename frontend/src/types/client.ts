@@ -18,6 +18,19 @@
   direccion?: string;
   direccion_completa?: string;
   address?: string;
+  codigo_postal?: string;
+  AddressZipCode?: string;
+  ciudad?: string;
+  AddressCity?: string;
+  estado?: string;
+  AddressState?: string;
+  condado?: string;
+  AddressCounty?: string;
+  CountyName?: string;
+  calle?: string;
+  AddressStreet?: string;
+  altura?: string;
+  AddressStreetNumber?: string;
   store_preferida?: string;
 }
 
