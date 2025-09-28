@@ -75,15 +75,28 @@ export const request = async <T = unknown>(input: string, options: RequestOption
     };
   }
 
-  const response = await fetch(input, { ...init, method });
-  const payload = await parseResponse(response, parseAs);
+  try {
+    const response = await fetch(input, { ...init, method });
+    const payload = await parseResponse(response, parseAs);
 
-  if (!response.ok) {
-    const message = typeof payload === 'string' && payload ? payload : response.statusText || 'Request failed';
-    throw new ApiError(message, response.status, payload);
+    if (!response.ok) {
+      const message = typeof payload === 'string' && payload ? payload : response.statusText || 'Request failed';
+      throw new ApiError(message, response.status, payload);
+    }
+
+    return payload as T;
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+
+    const message =
+      error instanceof Error && error.message
+        ? error.message
+        : 'No se pudo conectar con el backend. Verificá que el servicio esté disponible.';
+
+    throw new ApiError(message, 0, null);
   }
-
-  return payload as T;
 };
 
 export const get = <T = unknown>(url: string, options?: RequestOptions) =>
