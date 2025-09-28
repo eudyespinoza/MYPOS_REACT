@@ -37,9 +37,15 @@ const isBodyInit = (value: unknown): value is BodyInit => {
 
 export const request = async <T = unknown>(input: string, options: RequestOptions = {}): Promise<T> => {
   const { parseAs = 'json', headers, method, body, ...rest } = options;
+  const defaultHeaders: HeadersInit = {
+    'X-Requested-With': 'XMLHttpRequest',
+    Accept: 'application/json',
+  };
+
   const init: RequestInit = {
     ...rest,
     headers: {
+      ...defaultHeaders,
       ...(headers ?? {}),
     },
     credentials: rest.credentials ?? 'include',
