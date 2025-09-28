@@ -4,15 +4,31 @@
 
 Desde la terminal siempre ubicarse en la carpeta donde está el proyecto
 
-Para iniciar por primera vez es necesario aplicar un migrate
+## Backend ligero para el nuevo front POS
 
-# python manage.py migrate 
+El proyecto ahora incluye un backend especializado construido con **FastAPI** y
+orientado exclusivamente al front POS basado en React. Esta aplicación expone
+los mismos endpoints que consumen los hooks del front y lee los datos desde los
+archivos Parquet generados por un proceso externo en `C:\cache` (o la ruta
+configurada mediante `SERVICES_CACHE_DIR`). No es necesario ejecutar jobs ni
+schedulers dentro de la app.
 
-Luego corran el server en el puerto 8000 o donde les parezca
+### Puesta en marcha rápida
 
-# python manage.py runserver 8000
+```bash
+cd app
+python -m venv .venv
+source .venv/bin/activate  # En Windows: .venv\\Scripts\\activate
+pip install -r requirements.txt
+uvicorn backend_app.main:app --reload --port 8000
+```
 
-Para acceder a la aplicacion: http://127.0.0.1:8000/
+El front espera los endpoints en `http://127.0.0.1:8000/`.
+
+> **Nota:** La documentación histórica basada en Django se conserva más abajo
+> como referencia del backend anterior. Muchos conceptos (estructura de datos,
+> nomenclaturas de columnas, rutas de Parquet) siguen siendo útiles, pero ya no
+> es necesario ejecutar migraciones ni el `manage.py runserver`.
 
 
 Aplicación Django para buscador y punto de venta (POS) con UI Bootstrap 5, cachés locales (Parquet/SQLite) e integración con servicios externos (Fabric/D365). Incluye catálogo con filtros, carrito con multipagos, modal de stock, detalles con atributos, simulador de pagos externo y generación de presupuesto.

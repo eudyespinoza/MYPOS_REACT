@@ -5,6 +5,8 @@ certifi
 charset-normalizer
 djangorestframework
 Django
+fastapi
+uvicorn
 h11
 httpcore
 httpx
