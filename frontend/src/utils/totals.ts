@@ -86,6 +86,12 @@ const fallbackUuid = (): string =>
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random()}`;
 
+const numericInput = (value: unknown): number | string | null | undefined => {
+  if (typeof value === 'number' || typeof value === 'string') return value;
+  if (value == null) return value;
+  return undefined;
+};
+
 const parseLogistics = (raw: unknown): LogisticsInfo => {
   const base: LogisticsInfo = {
     mode: 'pickup',
@@ -105,7 +111,8 @@ const parseLogistics = (raw: unknown): LogisticsInfo => {
   const scheduledDate = optionalString(get('scheduledDate')) ?? optionalString(get('fecha'));
   const address = optionalString(get('address')) ?? optionalString(get('direccion'));
   const notes = optionalString(get('notes')) ?? optionalString(get('obs'));
-  const cost = Math.max(0, toNumber(get('cost') ?? get('costo')) || 0);
+  const costSource = get('cost') ?? get('costo');
+  const cost = Math.max(0, toNumber(numericInput(costSource)) || 0);
 
   return {
     mode,
@@ -136,12 +143,23 @@ const parseLineCandidate = (candidate: unknown): CartLine | null => {
   const name = requiredString(get('name') ?? get('nombre') ?? get('descripcion'), productId);
   const code = requiredString(get('code') ?? get('sku') ?? get('numero_producto') ?? get('codigo'), productId);
   const lineId = requiredString(get('lineId') ?? get('line_id'), fallbackUuid());
-  const price = toNumber(get('price') ?? get('precio') ?? get('precio_unit')) || 0;
-  const iva = toNumber(get('iva') ?? get('taxRate') ?? get('tax_rate')) || 0;
-  const quantity = Math.max(0.0001, toNumber(get('quantity') ?? get('cantidad')) || 1);
+  const price = toNumber(
+    numericInput(get('price') ?? get('precio') ?? get('precio_unit')),
+  ) || 0;
+  const iva = toNumber(numericInput(get('iva') ?? get('taxRate') ?? get('tax_rate'))) || 0;
+  const quantity = Math.max(
+    0.0001,
+    toNumber(numericInput(get('quantity') ?? get('cantidad'))) || 1,
+  );
   const unit = requiredString(get('unit') ?? get('unidad'), 'Un');
-  const multiple = Math.max(0.0001, toNumber(get('multiple') ?? get('multiplo')) || 1);
-  const weightKg = Math.max(0, toNumber(get('weightKg') ?? get('pesoKg') ?? get('peso')) || 0);
+  const multiple = Math.max(
+    0.0001,
+    toNumber(numericInput(get('multiple') ?? get('multiplo'))) || 1,
+  );
+  const weightKg = Math.max(
+    0,
+    toNumber(numericInput(get('weightKg') ?? get('pesoKg') ?? get('peso'))) || 0,
+  );
 
   let discount: CartLine['discount'] = null;
   const discountCandidate = source.discount;
@@ -150,12 +168,12 @@ const parseLineCandidate = (candidate: unknown): CartLine | null => {
     discount = type
       ? {
           type,
-          value: toNumber(discountCandidate.value) || 0,
+          value: toNumber(numericInput(discountCandidate.value)) || 0,
         }
       : null;
   } else {
-    const percent = toNumber(get('discountPercent') ?? get('descuentoPorcentaje'));
-    const amount = toNumber(get('discountAmount') ?? get('descuentoMonto'));
+    const percent = toNumber(numericInput(get('discountPercent') ?? get('descuentoPorcentaje')));
+    const amount = toNumber(numericInput(get('discountAmount') ?? get('descuentoMonto')));
     if (percent) {
       discount = {
         type: 'percent',
@@ -236,12 +254,18 @@ export const deserializeCartSnapshot = (
   const hasLegacyAmount = draft.globalDiscountAmount == null && draft.descMonto != null;
   if (hasLegacyPercent || hasLegacyAmount) converted = true;
 
-  const globalDiscountPercent = toNumber(
-    draft.globalDiscountPercent ?? (hasLegacyPercent ? draft.descPorcentaje : undefined),
-  ) || 0;
-  const globalDiscountAmount = toNumber(
-    draft.globalDiscountAmount ?? (hasLegacyAmount ? draft.descMonto : undefined),
-  ) || 0;
+  const globalDiscountPercent =
+    toNumber(
+      numericInput(
+        draft.globalDiscountPercent ?? (hasLegacyPercent ? draft.descPorcentaje : undefined),
+      ),
+    ) || 0;
+  const globalDiscountAmount =
+    toNumber(
+      numericInput(
+        draft.globalDiscountAmount ?? (hasLegacyAmount ? draft.descMonto : undefined),
+      ),
+    ) || 0;
 
   const usedLegacyLogistics = !draft.logistics && draft.logistica;
   if (usedLegacyLogistics) converted = true;
@@ -254,9 +278,9 @@ export const deserializeCartSnapshot = (
     ? draft.payments.map((payment) => ({
         id: requiredString(payment?.id, fallbackUuid()),
         method: requiredString(payment?.method, ''),
-        amount: toNumber(payment?.amount) || 0,
+        amount: toNumber(numericInput(payment?.amount)) || 0,
         installments: Number(payment?.installments ?? 1) || 1,
-        interest: toNumber(payment?.interest) || 0,
+        interest: toNumber(numericInput(payment?.interest)) || 0,
         brand: optionalString(payment?.brand),
         reference: optionalString(payment?.reference),
       }))

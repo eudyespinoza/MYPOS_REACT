@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { fetchUserInfo, fetchRemoteCart, updateLastStore } from '@/api/cart';
+import type { UserInfoResponse } from '@/api/cart';
 import { fetchAllProducts, fetchProductByCode } from '@/api/products';
 import { queryKeys } from '@/api/queryKeys';
 import { useCartStore } from '@/stores/useCartStore';
@@ -22,6 +23,7 @@ import { Modal } from '@/components/Modal';
 import { AuxiliarySearchPanels } from '@/components/AuxiliarySearchPanels';
 import { getBootstrapData } from '@/utils/bootstrap';
 import type { Product } from '@/types/product';
+import type { CartSnapshot } from '@/types/cart';
 
 const normalize = (value: string) =>
   value
@@ -63,7 +65,6 @@ export const POSPage = () => {
     addProduct,
     hydrateRemoteCart,
     cart,
-    totals,
     needsSync,
     isSyncing,
     setClient,
@@ -72,7 +73,6 @@ export const POSPage = () => {
     addProduct: state.addProduct,
     hydrateRemoteCart: state.hydrateRemoteCart,
     cart: state.cart,
-    totals: state.totals,
     needsSync: state.needsSync,
     isSyncing: state.isSyncing,
     setClient: state.setClient,
@@ -130,17 +130,23 @@ export const POSPage = () => {
     }
   }, [bootstrapData, setStoreId, storeId]);
 
-  const userInfoQuery = useQuery({
+  const userInfoQuery = useQuery<UserInfoResponse>({
     queryKey: queryKeys.userInfo,
     queryFn: fetchUserInfo,
     staleTime: 5 * 60 * 1000,
-    onError: (error) =>
-      pushToast({
-        tone: 'error',
-        title: 'No se pudo obtener la sesión',
-        description: getErrorMessage(error, 'Reintenta más tarde o vuelve a iniciar sesión.'),
-      }),
   });
+
+  useEffect(() => {
+    if (!userInfoQuery.error) return;
+    pushToast({
+      tone: 'error',
+      title: 'No se pudo obtener la sesión',
+      description: getErrorMessage(
+        userInfoQuery.error,
+        'Reintenta más tarde o vuelve a iniciar sesión.',
+      ),
+    });
+  }, [pushToast, userInfoQuery.error]);
 
   useEffect(() => {
     if (!userInfoQuery.data) return;
@@ -177,33 +183,44 @@ export const POSPage = () => {
     userInfoQuery.data,
   ]);
 
-  useQuery({
+  const remoteCartQuery = useQuery<CartSnapshot | null>({
     queryKey: queryKeys.remoteCart,
     queryFn: fetchRemoteCart,
     enabled: !!userInfoQuery.data?.email,
-    onSuccess: (snapshot) => {
-      if (snapshot) hydrateRemoteCart(snapshot);
-    },
-    onError: (error) =>
-      pushToast({
-        tone: 'warning',
-        title: 'No se pudo cargar el carrito remoto',
-        description: getErrorMessage(error, 'Puedes seguir operando offline.'),
-      }),
   });
 
-  const productsQuery = useQuery({
+  useEffect(() => {
+    if (!remoteCartQuery.data) return;
+    hydrateRemoteCart(remoteCartQuery.data);
+  }, [hydrateRemoteCart, remoteCartQuery.data]);
+
+  useEffect(() => {
+    if (!remoteCartQuery.error) return;
+    pushToast({
+      tone: 'warning',
+      title: 'No se pudo cargar el carrito remoto',
+      description: getErrorMessage(remoteCartQuery.error, 'Puedes seguir operando offline.'),
+    });
+  }, [pushToast, remoteCartQuery.error]);
+
+  const productsQuery = useQuery<Product[]>({
     queryKey: storeId ? queryKeys.products(storeId) : ['products', 'default'],
     queryFn: () => fetchAllProducts(storeId ?? ''),
     enabled: Boolean(storeId),
     staleTime: 60 * 1000,
-    onError: (error) =>
-      pushToast({
-        tone: 'error',
-        title: 'Error al cargar productos',
-        description: getErrorMessage(error, 'Revisa la conexión e intenta nuevamente.'),
-      }),
   });
+
+  useEffect(() => {
+    if (!productsQuery.error) return;
+    pushToast({
+      tone: 'error',
+      title: 'Error al cargar productos',
+      description: getErrorMessage(
+        productsQuery.error,
+        'Revisa la conexión e intenta nuevamente.',
+      ),
+    });
+  }, [productsQuery.error, pushToast]);
 
   const updateStoreMutation = useMutation({
     mutationFn: (value: string) => updateLastStore(value),

@@ -9,7 +9,7 @@ interface TopBarProps {
   query: string;
   onQueryChange: (value: string) => void;
   onClearQuery: () => void;
-  searchRef: RefObject<HTMLInputElement>;
+  searchRef: RefObject<HTMLInputElement | null>;
   onBarcodeScan: (code: string) => void;
   theme: ThemeMode;
   onToggleTheme: () => void;

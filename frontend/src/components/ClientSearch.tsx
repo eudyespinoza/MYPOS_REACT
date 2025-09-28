@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { Client, ClientResponse } from '@/types/client';
-import { searchClients, createClient, ClientPayload } from '@/api/clients';
+import { searchClients, createClient } from '@/api/clients';
+import type { ClientPayload } from '@/api/clients';
 import { queryKeys } from '@/api/queryKeys';
 import { useToastStore } from '@/stores/useToastStore';
 import { normalizeClient } from '@/utils/normalizers';
@@ -182,20 +183,25 @@ export const ClientSearch = ({ open, onClose, onSelect }: Props) => {
 
   const normalizedQuery = query.trim();
 
-  const { data: rawResults = [], isFetching } = useQuery<ClientResponse[]>({
+  const {
+    data: rawResults = [],
+    isFetching,
+    error: queryError,
+  } = useQuery<ClientResponse[]>({
     queryKey: queryKeys.clients(normalizedQuery),
     queryFn: () => searchClients(normalizedQuery),
     enabled: open && normalizedQuery.length > 2,
-    initialData: [],
-    onError: (error) =>
-      pushToast({
-        tone: 'warning',
-        title: 'No se pudo buscar clientes',
-        description: error instanceof Error ? error.message : 'Reintenta en unos segundos.',
-      }),
+    initialData: [] as ClientResponse[],
   });
 
-  const normalizedResults = useMemo(() => rawResults.map(normalizeClient), [rawResults]);
+  useEffect(() => {
+    if (!queryError) return;
+    const description =
+      queryError instanceof Error ? queryError.message : 'Reintenta en unos segundos.';
+    pushToast({ tone: 'warning', title: 'No se pudo buscar clientes', description });
+  }, [pushToast, queryError]);
+
+  const normalizedResults = useMemo<Client[]>(() => rawResults.map(normalizeClient), [rawResults]);
 
   useEffect(() => {
     if (!open) return;
@@ -324,6 +330,7 @@ export const ClientSearch = ({ open, onClose, onSelect }: Props) => {
               <ul className="divide-y divide-slate-800">
                 {normalizedResults.map((client, index) => {
                   const raw = rawResults[index];
+                  if (!raw) return null;
                   return (
                     <li key={client.id} className="bg-slate-900">
                       <div className="flex flex-col">
