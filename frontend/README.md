@@ -1,6 +1,6 @@
 # POS Frontend (React + Vite)
 
-Single screen Point of Sale UI built with React 18, TypeScript, Tailwind CSS, Zustand and TanStack Query. The app talks to the existing Django backend via the provided REST endpoints and keeps the current localStorage contract (`pos.front.state`).
+Single screen Point of Sale UI built with React 18, TypeScript, Tailwind CSS, Zustand and TanStack Query. The app communicates with the FastAPI backend available under `/api/*` and keeps compatibility with the existing `localStorage` contract (`pos.front.state`).
 
 ## Requisitos
 
@@ -17,44 +17,24 @@ pnpm preview      # sirve el build para verificación
 pnpm test         # ejecuta las pruebas unitarias (Vitest)
 ```
 
-Durante el desarrollo Vite proxea automáticamente `/api`, `/producto`, `/auth_app` y `/auth` hacia `http://localhost:8000` para evitar problemas de CORS y mantener los redireccionamientos de login en el mismo host del frontend.
+Durante el desarrollo Vite proxea automáticamente `/api` y rutas relacionadas hacia `http://localhost:8000` para evitar problemas de CORS y mantener los redireccionamientos en el mismo host del backend.
 
 ### Configurar la URL del backend
 
 - Define la variable `VITE_BACKEND_URL` (por ejemplo en un archivo `.env` o variable de entorno) con la URL base del backend FastAPI.
 - Si no se define, el frontend usará rutas relativas, ideales cuando el reverse proxy sirve backend y frontend bajo el mismo dominio.
-- En Docker Compose ya se provee este valor (`http://web:8000`) para que el frontend converse con el nuevo backend automáticamente.
+- En Docker Compose ya se provee este valor (`http://api:8000`) para que el frontend converse con el backend automáticamente.
 
-## Integración con Django
+### Bootstrap inicial
 
-1. Ejecuta `pnpm build` para generar la carpeta `dist/`.
-2. Copia el contenido de `dist/` a la carpeta estática de Django, por ejemplo `core/static/pos/`.
-3. Ajusta la plantilla de Django para incluir el bundle principal (`assets/index-*.js`) y la hoja de estilos (`assets/index-*.css`). Si usas `django.contrib.staticfiles`, basta con referenciar `static('pos/index.html')` o servir el build como plantilla principal.
-4. Recuerda ejecutar `python manage.py collectstatic` en despliegues productivos.
-5. El bundle se comporta como una SPA. Django debe seguir sirviendo los endpoints API y la cookie CSRF.
-
-### Incluir en una plantilla existente
-
-```django
-{% load static %}
-<div id="root"></div>
-<script defer src="{% static 'pos/assets/index-XYZ.js' %}"></script>
-<link rel="stylesheet" href="{% static 'pos/assets/index-XYZ.css' %}" />
-```
-
-### Scripts de bootstrap compatibles con Django
-
-Para mantener la compatibilidad con el template actual de Django, la plantilla debe inyectar dos scripts JSON antes de montar la SPA:
+Para ambientes donde el backend no puede responder inmediatamente con `/api/user_info`, la plantilla HTML puede inyectar dos scripts JSON antes de montar la SPA:
 
 ```html
-<script id="backend-stores-data" type="application/json">{{ stores_json|safe }}</script>
-<script id="backend-last-store-data" type="application/json">{{ last_store_json|safe }}</script>
+<script id="backend-stores-data" type="application/json">{ "stores": ["Casa Central", "Sucursal 2"] }</script>
+<script id="backend-last-store-data" type="application/json">{ "last_store": "Casa Central" }</script>
 ```
 
-- `backend-stores-data` debe contener la lista de sucursales disponibles (array de strings o un objeto con la clave `stores`).
-- `backend-last-store-data` expone la última sucursal seleccionada (string u objeto con la clave `last_store`).
-
-La app lee estos scripts al iniciar para hidratar `useSessionStore.setStores` y `useFiltersStore.setStoreId` si la respuesta de `/api/user_info` no provee sucursales, evitando romper la experiencia existente mientras conviven ambas fuentes de datos.
+La app lee estos scripts al iniciar para hidratar `useSessionStore.setStores` y `useFiltersStore.setStoreId` si la respuesta de `/api/user_info` no provee sucursales, manteniendo compatibilidad con entornos mixtos.
 
 ## Hotkeys por defecto
 

@@ -3,7 +3,6 @@ FROM python:3.12-slim-bookworm
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-# --- ODBC runtime + MS ODBC Driver 18 (para Debian 12/bookworm) ---
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl ca-certificates gnupg2 apt-transport-https \
     build-essential \
@@ -20,24 +19,20 @@ RUN set -eux; \
 
 WORKDIR /app
 
-# Requisitos Python
 COPY requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt
 
-# Usuario no root
 RUN useradd -m -u 1000 app
 
-# Código y entrypoint
 COPY src /app
 COPY entrypoint.sh /entrypoint.sh
 
 RUN chmod +x /entrypoint.sh \
-    && mkdir -p /app/staticfiles /app/logs /data/services_db /data/cache /data/sessions \
+    && mkdir -p /app/logs /data/services_db /data/cache \
     && chown -R app:app /app /data \
-    && chmod -R 755 /app/staticfiles /app/logs /data/services_db /data/cache /data/sessions \
+    && chmod -R 755 /app /data \
     && chmod -R 777 /app/logs
 
 USER app
 EXPOSE 8000
 CMD ["/entrypoint.sh"]
-

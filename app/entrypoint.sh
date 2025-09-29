@@ -1,20 +1,19 @@
 #!/bin/sh
 set -e
 
-: "${DJANGO_SETTINGS_MODULE:=buscador_django.settings}"
-: "${DJANGO_WSGI_MODULE:=buscador_django.wsgi}"
-: "${GUNICORN_WORKERS:=3}"
-: "${GUNICORN_TIMEOUT:=60}"
+: "${UVICORN_HOST:=0.0.0.0}"
+: "${UVICORN_PORT:=8000}"
+: "${UVICORN_APP:=backend_app.main:app}"
+: "${UVICORN_RELOAD:=0}"
+: "${UVICORN_WORKERS:=1}"
 
-# Asegurar permisos correctos en logs cada vez que se inicie el contenedor
 mkdir -p /app/logs
 chmod 777 /app/logs
 
-python manage.py collectstatic --noinput
-python manage.py migrate --noinput
-
-exec python -m gunicorn "${DJANGO_WSGI_MODULE}:application" \
-  --bind 0.0.0.0:8000 \
-  --workers "${GUNICORN_WORKERS}" \
-  --timeout "${GUNICORN_TIMEOUT}" \
-  --access-logfile - --error-logfile -
+if [ "$UVICORN_RELOAD" = "1" ]; then
+  exec uvicorn "$UVICORN_APP" --host "$UVICORN_HOST" --port "$UVICORN_PORT" --reload
+elif [ "$UVICORN_WORKERS" -gt 1 ]; then
+  exec uvicorn "$UVICORN_APP" --host "$UVICORN_HOST" --port "$UVICORN_PORT" --workers "$UVICORN_WORKERS"
+else
+  exec uvicorn "$UVICORN_APP" --host "$UVICORN_HOST" --port "$UVICORN_PORT"
+fi
