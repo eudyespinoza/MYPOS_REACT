@@ -46,6 +46,16 @@ const getBrowserOrigin = () => {
   return removeTrailingSlash(window.location.origin);
 };
 
+const isLikelyDockerOnlyHostname = (hostname: string) => {
+  if (!hostname) return false;
+
+  const normalized = hostname.toLowerCase();
+  if (LOCAL_HOSTS.has(normalized)) return false;
+
+  // Hostnames without dots are typically Docker service names (eg: "web").
+  return !normalized.includes('.');
+};
+
 const shouldFallbackToBrowserOrigin = (url: URL) => {
   if (typeof window === 'undefined') return false;
 
@@ -53,9 +63,17 @@ const shouldFallbackToBrowserOrigin = (url: URL) => {
   if (!hostname) return true;
 
   const normalizedHost = hostname.toLowerCase();
+  const browserHostname = window.location.hostname?.trim().toLowerCase() ?? '';
 
+  if (!browserHostname) return false;
+  if (normalizedHost === browserHostname) return false;
   if (LOCAL_HOSTS.has(normalizedHost)) return false;
-  if (normalizedHost === window.location.hostname.toLowerCase()) return false;
+
+  const browserIsLocal = LOCAL_HOSTS.has(browserHostname);
+
+  if (browserIsLocal && isLikelyDockerOnlyHostname(normalizedHost)) {
+    return true;
+  }
 
   return false;
 };
