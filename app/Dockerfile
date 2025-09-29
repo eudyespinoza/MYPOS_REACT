@@ -25,9 +25,10 @@ RUN pip install --no-cache-dir -r /app/requirements.txt
 RUN useradd -m -u 1000 app
 
 COPY src /app
-COPY entrypoint.sh /entrypoint.sh
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 
-RUN chmod +x /entrypoint.sh \
+RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh \
+    && chmod +x /usr/local/bin/entrypoint.sh \
     && mkdir -p /app/logs /data/services_db /data/cache \
     && chown -R app:app /app /data \
     && chmod -R 755 /app /data \
@@ -35,4 +36,4 @@ RUN chmod +x /entrypoint.sh \
 
 USER app
 EXPOSE 8000
-CMD ["/entrypoint.sh"]
+CMD ["/usr/local/bin/entrypoint.sh"]
