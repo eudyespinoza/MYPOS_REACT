@@ -21,29 +21,21 @@ services:
       - default
       - litecore_default
 
-  web:
+  api:
     build:
       context: ./app
       dockerfile: Dockerfile
-    container_name: mypos_web
+    container_name: mypos_api
     env_file: .env
     environment:
-      DJANGO_DEBUG: "${DJANGO_DEBUG}"
-      DJANGO_ALLOWED_HOSTS: "${DJANGO_ALLOWED_HOSTS}"
-      DJANGO_CSRF_TRUSTED_ORIGINS: "${DJANGO_CSRF_TRUSTED_ORIGINS}"
-      DJANGO_SECURE_COOKIES: "${DJANGO_SECURE_COOKIES}"
-      DATABASE_URL: "${DATABASE_URL}"
-      SERVICES_DB_DIR: "/data/services_db"
       SERVICES_CACHE_DIR: "/srv/data/parquet"
-      DJANGO_SESSION_FILE_PATH: "/data/sessions"
+      UVICORN_HOST: "0.0.0.0"
+      UVICORN_PORT: "8000"
     volumes:
-      - staticfiles:/app/staticfiles
       - logs:/app/logs:rw
       - servicesdb:/data/services_db
       - cache:/data/cache
-      - sessions:/data/sessions
       - "${PARQUET_CACHE_SOURCE:-/srv/data/parquet}:/srv/data/parquet"
-    user: "1000:1000"
     expose:
       - "8000"
     ports:
@@ -66,7 +58,7 @@ services:
       - default
       - litecore_default
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5).getcode()==200 else 1)\""]
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=5).getcode()==200 else 1)\""]
       interval: 20s
       timeout: 5s
       retries: 5
@@ -76,7 +68,7 @@ services:
     container_name: mypos_frontend
     working_dir: /app
     environment:
-      VITE_BACKEND_URL: "http://web:8000"
+      VITE_BACKEND_URL: "http://api:8000"
       VITE_PORT: "3000"
       NODE_ENV: development
     volumes:
@@ -86,17 +78,15 @@ services:
     ports:
       - "3000:3000"
     depends_on:
-      - web
+      - api
     restart: unless-stopped
     networks:
       - default
 
 volumes:
-  staticfiles:
   logs:
   servicesdb:
   cache:
-  sessions:
   frontend_node_modules:
 
 networks:

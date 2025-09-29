@@ -25,6 +25,7 @@ import pyarrow.parquet as pq
 from fastapi import Body, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
+from .services import parquet_service
 from services.config import (
     CACHE_DIR,
     CACHE_FILE_ATRIBUTOS,
@@ -303,6 +304,35 @@ def _matches_tokens(haystack: List[str], tokens: List[str]) -> bool:
     if not tokens:
         return True
     return all(any(token in candidate for candidate in haystack if candidate) for token in tokens)
+
+
+@app.get("/api/productos")
+def list_products(
+    text: Optional[str] = Query(None, description="Búsqueda de texto"),
+    sku: Optional[str] = Query(None, description="SKU exacto"),
+    barcode: Optional[str] = Query(None, description="Código de barras exacto"),
+    category: Optional[str] = Query(None, description="Categoría exacta"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(100, ge=1, le=500),
+    order_by: str = Query("nombre", description="Campo de ordenamiento"),
+    order_dir: str = Query("asc", pattern="^(?i)(asc|desc)$"),
+) -> Dict[str, Any]:
+    total, items = parquet_service.search_products(
+        text=text,
+        sku=sku,
+        barcode=barcode,
+        category=category,
+        page=page,
+        page_size=page_size,
+        order_by=order_by,
+        order_dir=(order_dir or "asc").lower(),
+    )
+    return {
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "items": items,
+    }
 
 
 @app.get("/api/productos/search")
@@ -731,4 +761,9 @@ def user_info() -> Dict[str, Any]:
 # =============================================================================
 @app.get("/health")
 def healthcheck() -> Dict[str, Any]:
+    return {"status": "ok"}
+
+
+@app.get("/api/health")
+def api_healthcheck() -> Dict[str, Any]:
     return {"status": "ok"}

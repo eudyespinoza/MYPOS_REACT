@@ -1,10 +1,9 @@
 anyio
 APScheduler
-asgiref
 certifi
 charset-normalizer
-Django
-djangorestframework
+fastapi
+uvicorn
 h11
 httpcore
 httpx
@@ -12,7 +11,6 @@ idna
 ldap3
 numpy
 pandas
-pip
 pyarrow
 pyasn1
 pyodbc
@@ -21,7 +19,6 @@ pytz
 requests
 six
 sniffio
-sqlparse
 tzdata
 tzlocal
 urllib3
