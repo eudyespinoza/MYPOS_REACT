@@ -38,6 +38,7 @@ const isBodyInit = (value: unknown): value is BodyInit => {
 const isAbsoluteUrl = (url: string) => /^https?:\/\//i.test(url);
 
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '0.0.0.0']);
+const DEV_FRONTEND_PORTS = new Set(['3000', '5173']);
 
 const removeTrailingSlash = (value: string) => (value.endsWith('/') ? value.slice(0, -1) : value);
 
@@ -78,21 +79,60 @@ const shouldFallbackToBrowserOrigin = (url: URL) => {
   return false;
 };
 
+const buildLocalBackendUrl = () => {
+  if (typeof window === 'undefined') {
+    return 'http://localhost:8000';
+  }
+
+  const protocol = window.location.protocol || 'http:';
+  const hostname = window.location.hostname || 'localhost';
+  const port = window.location.port;
+
+  const effectivePort = DEV_FRONTEND_PORTS.has(port) ? '8000' : port;
+  const formattedPort = effectivePort ? `:${effectivePort}` : '';
+
+  return removeTrailingSlash(`${protocol}//${hostname}${formattedPort}`);
+};
+
+const getBrowserFallbackBaseUrl = () => {
+  const origin = getBrowserOrigin();
+  if (!origin) {
+    return buildLocalBackendUrl();
+  }
+
+  try {
+    const url = new URL(origin);
+    const fallbackPort =
+      url.port || (typeof window !== 'undefined' ? window.location.port ?? '' : '');
+
+    if (DEV_FRONTEND_PORTS.has(fallbackPort)) {
+      url.port = '8000';
+    }
+
+    return removeTrailingSlash(url.toString());
+  } catch (error) {
+    console.warn('Invalid browser origin detected, using local backend fallback:', error);
+    return buildLocalBackendUrl();
+  }
+};
+
 const getBaseUrl = () => {
   const raw = import.meta.env.VITE_BACKEND_URL as string | undefined;
   const trimmed = raw?.trim();
 
-  if (!trimmed) return getBrowserOrigin();
+  const browserFallback = getBrowserFallbackBaseUrl();
+
+  if (!trimmed) return browserFallback;
 
   try {
     const base = new URL(trimmed, typeof window !== 'undefined' ? window.location.origin : undefined);
     if (shouldFallbackToBrowserOrigin(base)) {
-      return getBrowserOrigin();
+      return browserFallback;
     }
     return removeTrailingSlash(base.toString());
   } catch (error) {
     console.warn('Invalid VITE_BACKEND_URL, falling back to browser origin:', error);
-    return getBrowserOrigin() || removeTrailingSlash(trimmed);
+    return browserFallback || removeTrailingSlash(trimmed);
   }
 };
 
