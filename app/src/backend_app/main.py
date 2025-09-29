@@ -37,7 +37,12 @@ from services.config import (
 app = FastAPI(title="POS Backend", version="1.0.0")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -272,25 +277,6 @@ def _collect_store_names() -> List[str]:
 # =============================================================================
 # Endpoints de productos
 # =============================================================================
-@app.get("/api/productos")
-def list_products(
-    store: Optional[str] = Query(None, description="Identificador de tienda"),
-    page: int = Query(1, ge=1),
-    items_per_page: int = Query(5000, ge=1, le=5000),
-) -> List[Dict[str, Any]]:
-    """Devuelve una página de productos filtrados por tienda."""
-
-    table = parquet_cache.load(CACHE_FILE_PRODUCTOS)
-    if table is None:
-        return []
-    table = _rename_columns(table, PRODUCT_COLUMN_MAPPING)
-    table = _filter_by_store(table, store)
-    start = (page - 1) * items_per_page
-    sliced = table.slice(start, items_per_page)
-    records = sliced.to_pylist()
-    return [_normalize_product(record) for record in records]
-
-
 def _normalize_text(value: Any) -> str:
     text = _string(value).lower()
     if not text:

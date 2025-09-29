@@ -10,7 +10,7 @@ export default defineConfig(({ mode }) => {
 
   const createProxyConfig = () => ({
     target: backendUrl,
-    changeOrigin: false,
+    changeOrigin: true,
   });
 
   return {

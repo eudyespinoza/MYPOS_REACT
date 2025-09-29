@@ -138,10 +138,13 @@ const getBaseUrl = () => {
 
 const buildRequestUrl = (input: string) => {
   if (!input) return input;
+  // Si es absoluta, respetar tal cual
   if (isAbsoluteUrl(input)) return input;
+  // Si empieza con '/', usar ruta relativa: Vite proxea /api, /producto, /auth...
+  if (input.startsWith('/')) return input;
+  // Para rutas relativas sin slash, anteponer base solo en producción o cuando no haya proxy
   const baseUrl = getBaseUrl();
-  if (!baseUrl) return input;
-  return `${baseUrl}/${input.replace(/^\//, '')}`;
+  return baseUrl ? `${baseUrl}/${input.replace(/^\//, '')}` : `/${input.replace(/^\//, '')}`;
 };
 
 export const request = async <T = unknown>(input: string, options: RequestOptions = {}): Promise<T> => {
@@ -157,7 +160,8 @@ export const request = async <T = unknown>(input: string, options: RequestOption
       ...defaultHeaders,
       ...(headers ?? {}),
     },
-    credentials: rest.credentials ?? 'include',
+    // No enviar cookies por defecto; el proxy evita CORS en dev.
+    credentials: rest.credentials ?? 'same-origin',
   };
 
   const needsCsrf = method && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method.toUpperCase());
