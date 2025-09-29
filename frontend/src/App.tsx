@@ -2,9 +2,11 @@
 import { POSPage } from './pages/POS';
 import { ToastContainer } from './components/ToastContainer';
 import { useUiStore } from './stores/useUiStore';
+import { useMetaMaskWarning } from './hooks/useMetaMaskWarning';
 
 const App = () => {
   const theme = useUiStore((state) => state.theme);
+  useMetaMaskWarning();
 
   useEffect(() => {
     if (typeof document === 'undefined') return;
