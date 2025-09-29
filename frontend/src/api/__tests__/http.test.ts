@@ -42,7 +42,7 @@ describe('http client', () => {
     expect(fetchMock.mock.calls[0][0]).toBe('http://web:8000/api/test');
   });
 
-  it('falls back to the browser origin when running on localhost', async () => {
+  it('falls back to the local backend when running on localhost', async () => {
     vi.stubEnv('VITE_BACKEND_URL', 'http://web:8000');
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -55,6 +55,7 @@ describe('http client', () => {
       location: {
         origin: 'http://localhost:3000',
         hostname: 'localhost',
+        port: '3000',
       },
     } as unknown as Window & typeof globalThis;
 
@@ -66,6 +67,34 @@ describe('http client', () => {
     await get('/api/test');
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock.mock.calls[0][0]).toBe('http://localhost:3000/api/test');
+    expect(fetchMock.mock.calls[0][0]).toBe('http://localhost:8000/api/test');
+  });
+
+  it('uses the browser origin when running on non-dev ports', async () => {
+    vi.unstubAllEnvs();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: vi.fn().mockResolvedValue({ ok: true }),
+    });
+
+    const fakeWindow = {
+      location: {
+        origin: 'https://example.com',
+        hostname: 'example.com',
+        port: '',
+      },
+    } as unknown as Window & typeof globalThis;
+
+    vi.stubGlobal('window', fakeWindow);
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { get } = await import('../http');
+
+    await get('/api/test');
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe('https://example.com/api/test');
   });
 });
