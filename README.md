@@ -27,8 +27,48 @@ Create an `.env` file (see `app/src/.env.example`) and provide the credentials r
 
 ## Project Structure
 
-- `app/`: FastAPI backend and Docker assets.
-- `frontend/`: React application (Vite).
+### Backend (`app/`)
+
+```
+app/
+  Dockerfile           # Imagen base para FastAPI
+  entrypoint.sh        # Script de arranque usado en contenedores
+  requirements.txt     # Dependencias del backend para entornos locales/Docker
+  src/
+    backend_app/
+      main.py          # Punto de entrada de FastAPI (incluye routers y middlewares)
+      services/        # Adaptadores HTTP expuestos por el backend (ej. parquet_service)
+    services/          # Capa de dominio: integraciones D365, caché, correo, impuestos, etc.
+    config.py          # Configuración compartida (variables de entorno, rutas de datos)
+```
+
+El backend se organiza en dos niveles: `backend_app` contiene la aplicación FastAPI mínima y
+sus routers, mientras que `services/` concentra la lógica de negocio reutilizable y las
+integraciones externas (fabric, D365, correo, caching). Esto facilita probar los servicios de
+forma aislada y evita acoplarlos al framework web.
+
+### Frontend (`frontend/`)
+
+```
+frontend/
+  public/              # Assets estáticos servidos tal cual (favicon, imágenes)
+  src/
+    api/               # Clientes fetch + normalización de respuestas del backend
+    components/        # Componentes UI (TopBar, modales, paneles)
+    hooks/             # Hooks reutilizables (hotkeys, barcode, sincronización remota)
+    pages/             # Páginas de la SPA (POS principal)
+    stores/            # Zustand stores (carrito, filtros, sesión, toasts)
+    types/             # Tipos/DTO compartidos
+    utils/             # Helpers (cálculos, impresión, formato)
+  vite.config.ts       # Configuración de Vite + proxies
+  tailwind.config.js   # Tema y plugins de Tailwind CSS
+```
+
+El frontend es una aplicación Vite + React 18 con TypeScript. El módulo raíz (`src/pages/POS.tsx`)
+monta la pantalla única del POS reutilizando componentes desacoplados y stores centralizados.
+
+### Infraestructura
+
 - `traefik/`: Reverse proxy configuration for local/production deployments.
 
 ## Docker Compose
