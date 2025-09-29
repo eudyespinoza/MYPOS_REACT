@@ -37,7 +37,7 @@ const isBodyInit = (value: unknown): value is BodyInit => {
 
 const isAbsoluteUrl = (url: string) => /^https?:\/\//i.test(url);
 
-const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
+const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '0.0.0.0']);
 
 const removeTrailingSlash = (value: string) => (value.endsWith('/') ? value.slice(0, -1) : value);
 
@@ -57,8 +57,7 @@ const shouldFallbackToBrowserOrigin = (url: URL) => {
   if (LOCAL_HOSTS.has(normalizedHost)) return false;
   if (normalizedHost === window.location.hostname.toLowerCase()) return false;
 
-  const looksInternalNetworkHost = !normalizedHost.includes('.');
-  return looksInternalNetworkHost;
+  return false;
 };
 
 const getBaseUrl = () => {
